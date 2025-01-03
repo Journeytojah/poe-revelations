@@ -28,7 +28,7 @@ function resolveForeignKeyValue(value: string | number, referencedTable: any): a
 
 // 🚀 Page Load Function
 export const load: PageLoad = async ({ fetch, url }) => {
-  const tableNames = ['GemTags', 'GrantedEffects', 'GrantedEffectsPerLevel', 'GrantedEffectStatSetsPerLevel'];
+  const tableNames = ['GemTags', 'GrantedEffects', 'GrantedEffectsPerLevel', 'GrantedEffectStatSets', 'GrantedEffectStatSetsPerLevel'];
   const gameVersion = url.searchParams.get('version') || '1';
 
   const schemaFile = await fetchSchema(fetch);
