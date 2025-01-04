@@ -159,26 +159,35 @@
 
 				// Handle each placeholder ({0}, {1}, ...)
 				blockValues.forEach((blockValue, index) => {
-					let renderedValue = blockValue;
+					let renderedValue: number = blockValue;
+					let renderedText: string = blockValue.toString();
 
 					// Handle conversion: milliseconds → seconds with 2 decimal places
 					if (desc.includes('milliseconds_to_seconds_2dp_if_required')) {
 						renderedValue = parseFloat((blockValue / 1000).toFixed(2));
+						renderedText = renderedValue.toString();
 					}
 
 					// Handle conversion: per minute → per second
 					if (desc.includes('per_minute_to_per_second')) {
 						renderedValue = parseFloat((blockValue / 60).toFixed(1));
+						renderedText = renderedValue.toString();
 					}
 
-          // Handle division by 10 if includes divide_by_ten_1dp_if_required
-          if (desc.includes('divide_by_ten_1dp_if_required')) {
-            renderedValue = parseFloat((blockValue / 10).toFixed(1));
-          }
+					// Handle division by 10 if includes divide_by_ten_1dp_if_required
+					if (desc.includes('divide_by_ten_1dp_if_required')) {
+						renderedValue = parseFloat((blockValue / 10).toFixed(1));
+						renderedText = renderedValue.toString();
+					}
 
-
-					// Replace each placeholder dynamically
-					result = result.replace(new RegExp(`\\{${index}\\}`, 'g'), renderedValue.toString());
+					// Handle signed formatting "{0:+d}"
+					if (desc.includes(`{${index}:+d}`)) {
+						renderedText = blockValue >= 0 ? `+${blockValue}` : `${blockValue}`;
+						result = result.replace(new RegExp(`\\{${index}\\:\\+d\\}`, 'g'), renderedText);
+					} else {
+						// Regular placeholder replacement
+						result = result.replace(new RegExp(`\\{${index}\\}`, 'g'), renderedText);
+					}
 				});
 
 				// Handle `[Projectile|Projectiles]` for singular/plural
@@ -248,6 +257,17 @@
 		});
 	}
 
+  function findGrantedEffectsPerLevel(skillId: string) {
+    return grantedEffectsPerLevel.find((effect) => {
+      try {
+        return effect.GrantedEffect.Id === skillId;
+      } catch (error) {
+        console.error('Error', error);
+        return false;
+      }
+    });
+  }
+
 	function getDynamicStats() {
 		// const skillId = mockData.Id;
 		const skillId = rowStoreData?.Id;
@@ -255,6 +275,9 @@
 
 		const grantedEffect = findGrantedEffectId(skillId);
 		console.log('Effect (Dynamic)', grantedEffect.Id);
+
+    const grantedEffectsPerLevel = findGrantedEffectsPerLevel(grantedEffect.Id);
+    console.log('EffectPerLevel', grantedEffectsPerLevel);
 
 		const grantedEffectStatSetPerLevel = findGrantedEffectStatSetPerLevel(grantedEffect.Id);
 		console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
