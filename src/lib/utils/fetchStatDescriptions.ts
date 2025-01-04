@@ -13,7 +13,7 @@ export async function fetchStatDescriptions(
   }
   pathWithExtension = pathWithExtension.toLowerCase();
 
-  console.log('Fetching Stat Descriptions:', pathWithExtension);
+  // console.log('Fetching Stat Descriptions:', pathWithExtension);
   // console.log(indexUrl);
 
   const file = fileList.files.find((f: { path: string }) => f.path === pathWithExtension);

@@ -25,7 +25,8 @@
 	const grantedEffectsStatSetsPerLevel = data?.allData.GrantedEffectStatSetsPerLevel?.rows || [];
 
 	// Mocked RowStore
-	const rowStoreData = mockData;
+	// const rowStoreData = mockData;
+	const rowStoreData = get(rowStore);
 
 	// Stat Set to store unique statId and values
 	const statSet = new Set<{ id: string; value: number }>();
@@ -90,17 +91,34 @@
 		}
 
 		const { patchUrl } = await fetchVersion(fetch, gameVersion);
-		const statDescriptions = await fetchStatDescriptions(fetch, patchUrl, mockData.StatDescription);
+		const statDescriptions = await fetchStatDescriptions(
+			fetch,
+			patchUrl,
+			rowStoreData?.StatDescription
+		);
 
 		// Parse descriptions into structured blocks
 		const parsedBlocks = parseStatDescriptions(statDescriptions);
-		console.log('📦 Parsed Blocks:', parsedBlocks);
+		// console.log('📦 Parsed Blocks:', parsedBlocks);
+
+		// Track stats that have been processed
+		const processedStats = new Set<string>();
 
 		// Process each stat in the passed statSet
 		statSet.forEach(({ id, value }) => {
-			// Find a matching stat block after stripping numeric prefixes
+			// Avoid processing the same stat multiple times
+			if (processedStats.has(id)) {
+				return;
+			}
+
+			// Find matching stat block
 			const descriptionBlock = parsedBlocks.find((block) =>
-        block.stats.some((stat) => stat.split(' ').map(s => s.trim()).includes(id))
+				block.stats.some((stat) =>
+					stat
+						.split(' ')
+						.map((s) => s.trim())
+						.includes(id)
+				)
 			);
 
 			if (!descriptionBlock) {
@@ -111,27 +129,73 @@
 			console.log('🔍 Matched Block:', descriptionBlock);
 			console.log('Value:', value);
 
-			// Use the `value` directly from statSet
-			const renderedDescriptions = descriptionBlock.descriptions.map((desc) => {
-				let renderedValue = value;
+			// Process stats in multi-stat blocks
+			let blockStats = descriptionBlock.stats.flatMap((stat) =>
+				stat.split(' ').map((s) => s.trim())
+			);
 
-				// Handle conversion: milliseconds → seconds with 2 decimal places
-				if (desc.includes('milliseconds_to_seconds_2dp_if_required')) {
-					renderedValue = parseFloat((value / 1000).toFixed(2)); // Convert ms to seconds (2 dp)
+			// Remove numeric-only prefixes from blockStats
+			blockStats = blockStats.filter((stat) => !/^\d+$/.test(stat));
+
+			const blockValues: number[] = [];
+
+			// Match stats with their values from statSet
+			blockStats.forEach((statId) => {
+				const statEntry = statSet.find((s) => s.id === statId);
+				if (statEntry) {
+					blockValues.push(statEntry.value);
+					processedStats.add(statId); // Mark as processed
+				} else {
+					blockValues.push(0); // Default if not found
+				}
+			});
+
+			console.log('🔄 Block Stats:', blockStats);
+			console.log('💡 Block Values:', blockValues);
+
+			// Render descriptions
+			const renderedDescriptions = descriptionBlock.descriptions.map((desc) => {
+				let result = desc;
+
+				// Handle each placeholder ({0}, {1}, ...)
+				blockValues.forEach((blockValue, index) => {
+					let renderedValue = blockValue;
+
+					// Handle conversion: milliseconds → seconds with 2 decimal places
+					if (desc.includes('milliseconds_to_seconds_2dp_if_required')) {
+						renderedValue = parseFloat((blockValue / 1000).toFixed(2));
+					}
+
+					// Handle conversion: per minute → per second
+					if (desc.includes('per_minute_to_per_second')) {
+						renderedValue = parseFloat((blockValue / 60).toFixed(1));
+					}
+
+          // Handle division by 10 if includes divide_by_ten_1dp_if_required
+          if (desc.includes('divide_by_ten_1dp_if_required')) {
+            renderedValue = parseFloat((blockValue / 10).toFixed(1));
+          }
+
+
+					// Replace each placeholder dynamically
+					result = result.replace(new RegExp(`\\{${index}\\}`, 'g'), renderedValue.toString());
+				});
+
+				// Handle `[Projectile|Projectiles]` for singular/plural
+				if (result.includes('[Projectile|Projectiles]')) {
+					const pluralSuffix = blockValues[0] === 1 ? 'Projectile' : 'Projectiles';
+					result = result.replace('[Projectile|Projectiles]', pluralSuffix);
 				}
 
-				// Handle singular/plural formatting
-				const pluralSuffix = value === 1 ? '' : 's';
+				// Handle `[Chaos|Chaos]` edge case (static replacement)
+				if (result.includes('[Chaos|Chaos]')) {
+					result = result.replace('[Chaos|Chaos]', 'Chaos');
+				}
 
-				// Replace placeholders and clean up
-				let result = desc
-					.split('{0}')
-					.join(renderedValue.toString()) // Replace placeholder with value
-					.split('[Projectile|Projectiles]')
-					.join(value === 1 ? 'Projectile' : 'Projectiles') // Handle singular/plural
-					.split('{1}')
-					.join(pluralSuffix) // Handle any additional placeholder
-					.replace(/milliseconds_to_seconds_2dp_if_required/g, '') // Remove conversion directive
+				// Remove leftover directives
+				result = result
+					.replace(/milliseconds_to_seconds_2dp_if_required/g, '')
+					.replace(/per_minute_to_per_second/g, '') // Remove conversion directive
 					.replace(/\s{2,}/g, ' ') // Clean extra spaces
 					.trim(); // Remove trailing/leading spaces
 
@@ -143,7 +207,8 @@
 	}
 
 	function getConstantStats() {
-		const skillId = mockData.Id;
+		// const skillId = mockData.Id;
+		const skillId = rowStoreData?.Id;
 		console.log('SkillId', skillId);
 
 		const grantedEffect = findGrantedEffectId(skillId);
@@ -184,7 +249,8 @@
 	}
 
 	function getDynamicStats() {
-		const skillId = mockData.Id;
+		// const skillId = mockData.Id;
+		const skillId = rowStoreData?.Id;
 		console.log('SkillId (Dynamic)', skillId);
 
 		const grantedEffect = findGrantedEffectId(skillId);
@@ -210,7 +276,10 @@
 		getStatDescriptionsForAll(Array.from(statSet));
 
 		const floatStats = grantedEffectStatSetPerLevel?.FloatStats || [];
-		const floatStatsValues = grantedEffectStatSetPerLevel?.FloatStatsValues || [];
+		const floatStatsValues =
+			grantedEffectStatSetPerLevel?.BaseResolvedValues ||
+			grantedEffectStatSetPerLevel?.FloatStatsValues ||
+			[];
 
 		for (let i = 0; i < floatStats.length; i++) {
 			const statId = floatStats[i]?.Id; // Extract `Id` directly
