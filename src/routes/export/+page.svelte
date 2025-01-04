@@ -201,6 +201,16 @@
 					result = result.replace('[Chaos|Chaos]', 'Chaos');
 				}
 
+        // Handle `[Lightning]` edge case (static replacement)
+        if (result.includes('[Lightning]')) {
+          result = result.replace('[Lightning]', 'Lightning');
+        }
+
+        // Remove `# or # #` from the description
+        if (result.includes('#')) {
+          result = result.replace('# #', '');
+        }
+
 				// Remove leftover directives
 				result = result
 					.replace(/milliseconds_to_seconds_2dp_if_required/g, '')
@@ -215,6 +225,32 @@
 		});
 	}
 
+	// ✅ Build a Set of Valid Tags from GemTags
+	const validTags = new Set(gemTags.map((tag) => tag.Id));
+
+	// 📑 Step 1: Parse Skill Tags
+	function parseGemTags(skillTypes: { Id: string }[]): string {
+		const parsedGemTags = skillTypes
+			.filter((type) => validTags.has(type.Id.toLowerCase())) // Normalize to lowercase for comparison
+			.map((type) => {
+				const gemTag = gemTags.find((gemTag) => gemTag.Id.toLowerCase() === type.Id.toLowerCase());
+				console.log(`Mapping Type: ${type.Id}, Found Tag:`, gemTag.Name);
+
+				if (!gemTag?.Tag) return `${type.Id}`; // Fallback to readable tag if no match
+
+				// Extract text after the pipe if it exists
+				const tagText = gemTag.Tag.includes('|')
+					? gemTag.Tag.split('|')[1].replace(/[\[\]]/g, '') // Remove square brackets
+					: gemTag.Tag.replace(/[\[\]]/g, ''); // Remove square brackets
+				return tagText;
+			})
+			.filter((tag) => tag.trim() !== '') // Remove empty tags
+			.join(', ');
+
+		console.log('🏷️ Parsed Gem Tags:', parsedGemTags);
+		return parsedGemTags;
+	}
+
 	function getConstantStats() {
 		// const skillId = mockData.Id;
 		const skillId = rowStoreData?.Id;
@@ -222,6 +258,13 @@
 
 		const grantedEffect = findGrantedEffectId(skillId);
 		console.log('Effect', grantedEffect);
+
+		try {
+			const castTime = grantedEffect?.CastTime;
+			console.log('CastTime', castTime);
+		} catch (error) {
+			console.error(`No cast time found for skillId: ${skillId}`);
+		}
 
 		const grantedEffectStatSet = grantedEffectStatSets.find(
 			(statSet) => statSet.Id === grantedEffect?.Id
@@ -257,16 +300,16 @@
 		});
 	}
 
-  function findGrantedEffectsPerLevel(skillId: string) {
-    return grantedEffectsPerLevel.find((effect) => {
-      try {
-        return effect.GrantedEffect.Id === skillId;
-      } catch (error) {
-        console.error('Error', error);
-        return false;
-      }
-    });
-  }
+	function findGrantedEffectsPerLevel(skillId: string) {
+		return grantedEffectsPerLevel.find((effect) => {
+			try {
+				return effect.GrantedEffect.Id === skillId;
+			} catch (error) {
+				console.error('Error', error);
+				return false;
+			}
+		});
+	}
 
 	function getDynamicStats() {
 		// const skillId = mockData.Id;
@@ -276,8 +319,8 @@
 		const grantedEffect = findGrantedEffectId(skillId);
 		console.log('Effect (Dynamic)', grantedEffect.Id);
 
-    const grantedEffectsPerLevel = findGrantedEffectsPerLevel(grantedEffect.Id);
-    console.log('EffectPerLevel', grantedEffectsPerLevel);
+		const grantedEffectsPerLevel = findGrantedEffectsPerLevel(grantedEffect.Id);
+		console.log('EffectPerLevel', grantedEffectsPerLevel);
 
 		const grantedEffectStatSetPerLevel = findGrantedEffectStatSetPerLevel(grantedEffect.Id);
 		console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
@@ -324,6 +367,7 @@
 
 		getConstantStats();
 		getDynamicStats();
+		parseGemTags(rowStoreData?.ActiveSkillTypes);
 	});
 </script>
 
