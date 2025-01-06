@@ -8,7 +8,6 @@
 	import { rowStore } from '$lib/stores/rowStore';
 	import { fetchStatDescriptions } from '$lib/utils/fetchStatDescriptions.js';
 	import { fetchVersion } from '$lib/utils/fetchVersion.js';
-	import { mockData } from '$lib/utils/mockDataSpark.js';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 
@@ -23,6 +22,33 @@
 	const grantedEffectsPerLevel = data?.allData.GrantedEffectsPerLevel?.rows || [];
 	const grantedEffectStatSets = data?.allData.GrantedEffectStatSets?.rows || [];
 	const grantedEffectsStatSetsPerLevel = data?.allData.GrantedEffectStatSetsPerLevel?.rows || [];
+
+  // Create an object to store the data so we can generate the wikitext later
+  const skillData = {
+    rarity_id: '',
+    name: '',
+    size_x: 1,
+    size_y: 1,
+    drop_level: 1,
+    tags: '',
+    metadata_id: '',
+    help_text: '',
+    intelligence_percent: 0,
+    gem_tags: '',
+    gem_description: '',
+    active_skill_name: '',
+    item_class_id_restriction: '',
+    skill_id: '',
+    cast_time: 0,
+    required_level: 1,
+    static_cost_types: '',
+    static_critical_strike_chance: 0,
+    stat_text: '',
+  }
+
+  $: console.log('SkillData', skillData);
+  
+
 
 	// Mocked RowStore
 	// const rowStoreData = mockData;
@@ -261,6 +287,7 @@
 
 		try {
 			const castTime = grantedEffect?.CastTime;
+      skillData.cast_time = castTime;
 			console.log('CastTime', castTime);
 		} catch (error) {
 			console.error(`No cast time found for skillId: ${skillId}`);
