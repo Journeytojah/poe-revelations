@@ -23,32 +23,32 @@
 	const grantedEffectStatSets = data?.allData.GrantedEffectStatSets?.rows || [];
 	const grantedEffectsStatSetsPerLevel = data?.allData.GrantedEffectStatSetsPerLevel?.rows || [];
 
-  // Create an object to store the data so we can generate the wikitext later
-  const skillData = {
-    rarity_id: '',
-    name: '',
-    size_x: 1,
-    size_y: 1,
-    drop_level: 1,
-    tags: '',
-    metadata_id: '',
-    help_text: '',
-    intelligence_percent: 0,
-    gem_tags: '',
-    gem_description: '',
-    active_skill_name: '',
-    item_class_id_restriction: '',
-    skill_id: '',
-    cast_time: 0,
-    required_level: 1,
-    static_cost_types: '',
-    static_critical_strike_chance: 0,
-    stat_text: '',
-  }
+	// Create an object to store the data so we can generate the wikitext later
+	const skillData = {
+		rarity_id: 'normal',
+		name: '',
+    // TODO: Add support for other skill types
+    class_id: 'Active Skill Gem',
+		size_x: 1,
+		size_y: 1,
+		drop_level: 1,
+		tags: 'gem, default',
+		metadata_id: '',
+		help_text: '',
+		intelligence_percent: 0,
+		gem_tags: '',
+		gem_description: '',
+		active_skill_name: '',
+		item_class_id_restriction: '',
+		skill_id: '',
+		cast_time: 0,
+		required_level: 1,
+		static_cost_types: '',
+		static_critical_strike_chance: 0,
+		stat_text: ''
+	};
 
-  $: console.log('SkillData', skillData);
-  
-
+	$: console.log('SkillData', skillData);
 
 	// Mocked RowStore
 	// const rowStoreData = mockData;
@@ -125,10 +125,10 @@
 
 		// Parse descriptions into structured blocks
 		const parsedBlocks = parseStatDescriptions(statDescriptions);
-		// console.log('📦 Parsed Blocks:', parsedBlocks);
 
 		// Track stats that have been processed
 		const processedStats = new Set<string>();
+		const allRenderedDescriptions: string[] = []; // Collect all descriptions
 
 		// Process each stat in the passed statSet
 		statSet.forEach(({ id, value }) => {
@@ -222,33 +222,28 @@
 					result = result.replace('[Projectile|Projectiles]', pluralSuffix);
 				}
 
-				// Handle `[Chaos|Chaos]` edge case (static replacement)
-				if (result.includes('[Chaos|Chaos]')) {
-					result = result.replace('[Chaos|Chaos]', 'Chaos');
-				}
-
-        // Handle `[Lightning]` edge case (static replacement)
-        if (result.includes('[Lightning]')) {
-          result = result.replace('[Lightning]', 'Lightning');
-        }
-
-        // Remove `# or # #` from the description
-        if (result.includes('#')) {
-          result = result.replace('# #', '');
-        }
+				// Handle static replacements
+				result = result.replace('[Chaos|Chaos]', 'Chaos').replace('[Lightning]', 'Lightning');
 
 				// Remove leftover directives
 				result = result
 					.replace(/milliseconds_to_seconds_2dp_if_required/g, '')
-					.replace(/per_minute_to_per_second/g, '') // Remove conversion directive
+					.replace(/per_minute_to_per_second/g, '')
 					.replace(/\s{2,}/g, ' ') // Clean extra spaces
-					.trim(); // Remove trailing/leading spaces
+					.trim();
 
 				return result;
 			});
 
+			// Add rendered descriptions to the collection
+			allRenderedDescriptions.push(...renderedDescriptions);
+
 			console.log('📝 Rendered Descriptions:', renderedDescriptions);
 		});
+
+		// Join all rendered descriptions into skillData.stat_text
+		skillData.stat_text = allRenderedDescriptions.join('<br>');
+		console.log('📜 Final Stat Text:', skillData.stat_text);
 	}
 
 	// ✅ Build a Set of Valid Tags from GemTags
@@ -274,6 +269,7 @@
 			.join(', ');
 
 		console.log('🏷️ Parsed Gem Tags:', parsedGemTags);
+		skillData.gem_tags = parsedGemTags;
 		return parsedGemTags;
 	}
 
@@ -287,7 +283,7 @@
 
 		try {
 			const castTime = grantedEffect?.CastTime;
-      skillData.cast_time = castTime;
+			skillData.cast_time = castTime;
 			console.log('CastTime', castTime);
 		} catch (error) {
 			console.error(`No cast time found for skillId: ${skillId}`);
@@ -339,24 +335,26 @@
 	}
 
 	function getDynamicStats() {
-		// const skillId = mockData.Id;
 		const skillId = rowStoreData?.Id;
 		console.log('SkillId (Dynamic)', skillId);
 
-		const grantedEffect = findGrantedEffectId(skillId);
-		console.log('Effect (Dynamic)', grantedEffect.Id);
+    skillData.name = rowStoreData?.DisplayedName;
+    skillData.gem_description = rowStoreData?.Description;
 
-		const grantedEffectsPerLevel = findGrantedEffectsPerLevel(grantedEffect.Id);
+		const grantedEffect = findGrantedEffectId(skillId);
+		console.log('Effect (Dynamic)', grantedEffect?.Id);
+
+		const grantedEffectsPerLevel = findGrantedEffectsPerLevel(grantedEffect?.Id);
 		console.log('EffectPerLevel', grantedEffectsPerLevel);
 
-		const grantedEffectStatSetPerLevel = findGrantedEffectStatSetPerLevel(grantedEffect.Id);
+		const grantedEffectStatSetPerLevel = findGrantedEffectStatSetPerLevel(grantedEffect?.Id);
 		console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
 
 		const additionalStats = grantedEffectStatSetPerLevel?.AdditionalStats || [];
 		const additionalStatsValues = grantedEffectStatSetPerLevel?.AdditionalStatsValues || [];
 
 		for (let i = 0; i < additionalStats.length; i++) {
-			const statId = additionalStats[i]?.Id; // Extract `Id` directly
+			const statId = additionalStats[i]?.Id;
 			const statValue = additionalStatsValues[i];
 			if (statId) {
 				statSet.add({ id: statId, value: statValue });
@@ -366,7 +364,6 @@
 		}
 
 		console.log('📊 Collected Additional StatSet:', Array.from(statSet));
-		getStatDescriptionsForAll(Array.from(statSet));
 
 		const floatStats = grantedEffectStatSetPerLevel?.FloatStats || [];
 		const floatStatsValues =
@@ -375,7 +372,7 @@
 			[];
 
 		for (let i = 0; i < floatStats.length; i++) {
-			const statId = floatStats[i]?.Id; // Extract `Id` directly
+			const statId = floatStats[i]?.Id;
 			const statValue = floatStatsValues[i];
 			if (statId) {
 				statSet.add({ id: statId, value: statValue });
@@ -385,6 +382,7 @@
 		}
 
 		console.log('📊 Collected Float StatSet:', Array.from(statSet));
+
 		getStatDescriptionsForAll(Array.from(statSet));
 	}
 
@@ -402,4 +400,5 @@
 <p>{message}</p>
 
 <h2>Generated Wikitext:</h2>
-<pre>{wikitext}</pre>
+<!-- <pre>{skillData}</pre> -->
+<pre>{JSON.stringify(skillData, null, 2)}</pre>
