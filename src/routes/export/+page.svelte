@@ -43,11 +43,11 @@
 		cast_time: 0,
 		required_level: 1,
 		static_cost_types: '',
-    // TODO: format crit to 2 decimal places and %
-		static_critical_strike_chance: 0,
+		// TODO: format crit to 2 decimal places and %
+		static_critical_strike_chance: '',
 		stat_text: '',
-    // 
-    gem_tier: 0,
+		//
+		gem_tier: 0
 	};
 
 	$: console.log('SkillData', skillData);
@@ -251,30 +251,6 @@
 	// ✅ Build a Set of Valid Tags from GemTags
 	const validTags = new Set(gemTags.map((tag) => tag.Id));
 
-	// 📑 Step 1: Parse Skill Tags
-	function parseGemTags(skillTypes: { Id: string }[]): string {
-		const parsedGemTags = skillTypes
-			.filter((type) => validTags.has(type.Id.toLowerCase())) // Normalize to lowercase for comparison
-			.map((type) => {
-				const gemTag = gemTags.find((gemTag) => gemTag.Id.toLowerCase() === type.Id.toLowerCase());
-				console.log(`Mapping Type: ${type.Id}, Found Tag:`, gemTag.Name);
-
-				if (!gemTag?.Tag) return `${type.Id}`; // Fallback to readable tag if no match
-
-				// Extract text after the pipe if it exists
-				const tagText = gemTag.Tag.includes('|')
-					? gemTag.Tag.split('|')[1].replace(/[\[\]]/g, '') // Remove square brackets
-					: gemTag.Tag.replace(/[\[\]]/g, ''); // Remove square brackets
-				return tagText;
-			})
-			.filter((tag) => tag.trim() !== '') // Remove empty tags
-			.join(', ');
-
-		console.log('🏷️ Parsed Gem Tags:', parsedGemTags);
-		skillData.gem_tags = parsedGemTags;
-		return parsedGemTags;
-	}
-
 	function parseBaseItemTypes(skillId: string) {
 		// find the baseitemtype.name for the skill, case insensitive
 		const baseItemType = data?.allData.BaseItemTypes?.rows.find(
@@ -286,9 +262,9 @@
 		console.log('BaseItemTypeIndex', data?.allData.BaseItemTypes?.rows.indexOf(baseItemType));
 
 		skillData.metadata_id = baseItemType?.Id;
-    skillData.class_id = baseItemType?.ItemClass?.Id;
-    skillData.size_y = baseItemType?.Height;
-    skillData.size_x = baseItemType?.Width;
+		skillData.class_id = baseItemType?.ItemClass?.Id;
+		skillData.size_y = baseItemType?.Height;
+		skillData.size_x = baseItemType?.Width;
 
 		parseSkillGems(baseItemType?.Id);
 	}
@@ -301,7 +277,7 @@
 
 		console.log('SkillGem', skillGem);
 		skillData.intelligence_percent = skillGem?.IntelligenceRequirementPercent;
-    skillData.gem_tier = skillGem?.CraftingLevel;
+		skillData.gem_tier = skillGem?.CraftingLevel;
 	}
 
 	function getConstantStats() {
@@ -316,9 +292,9 @@
 
 		try {
 			const castTime = grantedEffect?.CastTime;
-      const staticCostType = grantedEffect?.CostTypes[0]?.Id;
+			const staticCostType = grantedEffect?.CostTypes[0]?.Id;
 			skillData.cast_time = castTime;
-      skillData.static_cost_types = staticCostType;
+			skillData.static_cost_types = staticCostType;
 			console.log('CastTime', castTime);
 		} catch (error) {
 			console.error(`No cast time found for skillId: ${skillId}`);
@@ -374,12 +350,14 @@
 		console.log('SkillId (Dynamic)', skillId);
 
 		skillData.name = rowStoreData?.DisplayedName;
-    skillData.skill_id = rowStoreData?.Id.charAt(0).toUpperCase() + rowStoreData?.Id.slice(1);
+		skillData.skill_id = rowStoreData?.Id.charAt(0).toUpperCase() + rowStoreData?.Id.slice(1);
 		skillData.gem_description = rowStoreData?.Description;
 
-    const weaponRestrictions = rowStoreData?.WeaponRestriction_ItemClasses || [];
-    const weaponRestrictionNames = weaponRestrictions.map((restriction: { Id: any; }) => restriction.Id);
-    skillData.item_class_id_restriction = weaponRestrictionNames.join(', ');
+		const weaponRestrictions = rowStoreData?.WeaponRestriction_ItemClasses || [];
+		const weaponRestrictionNames = weaponRestrictions.map(
+			(restriction: { Id: any }) => restriction.Id
+		);
+		skillData.item_class_id_restriction = weaponRestrictionNames.join(', ');
 
 		const grantedEffect = findGrantedEffectId(skillId);
 		console.log('Effect (Dynamic)', grantedEffect?.Id);
@@ -389,7 +367,13 @@
 
 		const grantedEffectStatSetPerLevel = findGrantedEffectStatSetPerLevel(grantedEffect?.Id);
 		console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
-    skillData.static_critical_strike_chance = grantedEffectStatSetPerLevel?.AttackCritChance || grantedEffectStatSetPerLevel?.SpellCritChance / 100;
+		const critChance =
+			grantedEffectStatSetPerLevel?.AttackCritChance ||
+			grantedEffectStatSetPerLevel?.SpellCritChance;
+		// add a % sign
+		skillData.static_critical_strike_chance = critChance
+			? `${(critChance / 100).toFixed(2)}%`
+			: '0%';
 
 		const additionalStats = grantedEffectStatSetPerLevel?.AdditionalStats || [];
 		const additionalStatsValues = grantedEffectStatSetPerLevel?.AdditionalStatsValues || [];
@@ -427,13 +411,42 @@
 		getStatDescriptionsForAll(Array.from(statSet));
 	}
 
+	function parseGemTags() {
+		let grantedEffect = rowStoreData?.GrantedEffect;
+		// find the granted effect in activeskills
+		let activeSkill = data?.allData.SkillGems?.rows.find(
+			(activeSkill) => activeSkill.GemEffects[0].Id === grantedEffect
+		);
+
+		console.log('ActiveSkill', activeSkill);
+
+		let gemTags = activeSkill?.GemEffects[0].GemTags;
+		let tags = gemTags.map((tag: number) => {
+			let gemTag = data?.allData.GemTags?.rows[tag];
+			console.log('GemTag', gemTag);
+
+			let tagName = gemTag.Name.replace(/[\[\]]/g, '');
+			tagName = tagName.includes('|') ? tagName.split('|')[1] : tagName;
+			if (tagName !== '') {
+				return tagName;
+			} else {
+				return null;
+			}
+		});
+
+		console.log('Tags', tags);
+		tags = tags.filter((tag: null) => tag !== null);
+
+		skillData.gem_tags = tags.join(', ');
+	}
+
 	onMount(async () => {
 		console.log('Data', data);
 		console.log('RowStore', rowStoreData);
 
 		getConstantStats();
 		getDynamicStats();
-		parseGemTags(rowStoreData?.ActiveSkillTypes);
+		parseGemTags();
 	});
 </script>
 
