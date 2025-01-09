@@ -27,14 +27,13 @@
 	const skillData = {
 		rarity_id: 'normal',
 		name: '',
-    // TODO: Add support for other skill types
-    class_id: 'Active Skill Gem',
-		size_x: 1,
-		size_y: 1,
+		class_id: '',
+		size_x: 0,
+		size_y: 0,
 		drop_level: 1,
 		tags: 'gem, default',
 		metadata_id: '',
-		help_text: '',
+		help_text: 'Skills can be managed in the Skills Panel.',
 		intelligence_percent: 0,
 		gem_tags: '',
 		gem_description: '',
@@ -44,8 +43,11 @@
 		cast_time: 0,
 		required_level: 1,
 		static_cost_types: '',
+    // TODO: format crit to 2 decimal places and %
 		static_critical_strike_chance: 0,
-		stat_text: ''
+		stat_text: '',
+    // 
+    gem_tier: 0,
 	};
 
 	$: console.log('SkillData', skillData);
@@ -273,17 +275,50 @@
 		return parsedGemTags;
 	}
 
+	function parseBaseItemTypes(skillId: string) {
+		// find the baseitemtype.name for the skill, case insensitive
+		const baseItemType = data?.allData.BaseItemTypes?.rows.find(
+			(baseItemType) => baseItemType.Name.toLowerCase() === skillId.toLowerCase()
+		);
+
+		console.log('BaseItemType', baseItemType);
+		// log the index of the baseitemtype
+		console.log('BaseItemTypeIndex', data?.allData.BaseItemTypes?.rows.indexOf(baseItemType));
+
+		skillData.metadata_id = baseItemType?.Id;
+    skillData.class_id = baseItemType?.ItemClass?.Id;
+    skillData.size_y = baseItemType?.Height;
+    skillData.size_x = baseItemType?.Width;
+
+		parseSkillGems(baseItemType?.Id);
+	}
+
+	function parseSkillGems(skillMetadata: string) {
+		// find the skillgem row that has the same metadata_id as the baseitemtype
+		const skillGem = data?.allData.SkillGems?.rows.find(
+			(skillGem) => skillGem.BaseItemType.Id === skillMetadata
+		);
+
+		console.log('SkillGem', skillGem);
+		skillData.intelligence_percent = skillGem?.IntelligenceRequirementPercent;
+    skillData.gem_tier = skillGem?.CraftingLevel;
+	}
+
 	function getConstantStats() {
 		// const skillId = mockData.Id;
 		const skillId = rowStoreData?.Id;
 		console.log('SkillId', skillId);
+
+		parseBaseItemTypes(skillId);
 
 		const grantedEffect = findGrantedEffectId(skillId);
 		console.log('Effect', grantedEffect);
 
 		try {
 			const castTime = grantedEffect?.CastTime;
+      const staticCostType = grantedEffect?.CostTypes[0]?.Id;
 			skillData.cast_time = castTime;
+      skillData.static_cost_types = staticCostType;
 			console.log('CastTime', castTime);
 		} catch (error) {
 			console.error(`No cast time found for skillId: ${skillId}`);
@@ -338,8 +373,13 @@
 		const skillId = rowStoreData?.Id;
 		console.log('SkillId (Dynamic)', skillId);
 
-    skillData.name = rowStoreData?.DisplayedName;
-    skillData.gem_description = rowStoreData?.Description;
+		skillData.name = rowStoreData?.DisplayedName;
+    skillData.skill_id = rowStoreData?.Id.charAt(0).toUpperCase() + rowStoreData?.Id.slice(1);
+		skillData.gem_description = rowStoreData?.Description;
+
+    const weaponRestrictions = rowStoreData?.WeaponRestriction_ItemClasses || [];
+    const weaponRestrictionNames = weaponRestrictions.map((restriction: { Id: any; }) => restriction.Id);
+    skillData.item_class_id_restriction = weaponRestrictionNames.join(', ');
 
 		const grantedEffect = findGrantedEffectId(skillId);
 		console.log('Effect (Dynamic)', grantedEffect?.Id);
@@ -349,6 +389,7 @@
 
 		const grantedEffectStatSetPerLevel = findGrantedEffectStatSetPerLevel(grantedEffect?.Id);
 		console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
+    skillData.static_critical_strike_chance = grantedEffectStatSetPerLevel?.AttackCritChance || grantedEffectStatSetPerLevel?.SpellCritChance / 100;
 
 		const additionalStats = grantedEffectStatSetPerLevel?.AdditionalStats || [];
 		const additionalStatsValues = grantedEffectStatSetPerLevel?.AdditionalStatsValues || [];
