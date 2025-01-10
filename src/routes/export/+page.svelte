@@ -50,7 +50,7 @@
 		gem_tier: 0
 	};
 
-	$: console.log('SkillData', skillData);
+	// $: console.log('SkillData', skillData);
 
 	// Mocked RowStore
 	// const rowStoreData = mockData;
@@ -59,10 +59,10 @@
 	// Stat Set to store unique statId and values
 	const statSet = new Set<{ id: string; value: number }>();
 
-	function findGrantedEffectId(skillId: string) {
+	async function findGrantedEffectId(skillId: string) {
 		return grantedEffects.find((effect) => {
 			try {
-				return effect.ActiveSkill.Id === skillId;
+				return effect.ActiveSkill?.Id === skillId;
 			} catch (error) {
 				console.error('Error', error);
 				return false;
@@ -251,10 +251,10 @@
 	// ✅ Build a Set of Valid Tags from GemTags
 	const validTags = new Set(gemTags.map((tag) => tag.Id));
 
-	function parseBaseItemTypes(skillId: string) {
+	function parseBaseItemTypes(skillId: string, skillName: string) {
 		// find the baseitemtype.name for the skill, case insensitive
 		const baseItemType = data?.allData.BaseItemTypes?.rows.find(
-			(baseItemType) => baseItemType.Name.toLowerCase() === skillId.toLowerCase()
+			(baseItemType) => baseItemType.Name.toLowerCase() === skillName.toLowerCase()
 		);
 
 		console.log('BaseItemType', baseItemType);
@@ -280,14 +280,17 @@
 		skillData.gem_tier = skillGem?.CraftingLevel;
 	}
 
-	function getConstantStats() {
+	async function getConstantStats() {
 		// const skillId = mockData.Id;
 		const skillId = rowStoreData?.Id;
 		console.log('SkillId', skillId);
+    const skillName = rowStoreData?.DisplayedName;
 
-		parseBaseItemTypes(skillId);
+    // TODO: figure out what the deal is here with the name. It's not always the same as the displayed name but its also not always the same as the granted effect name...
+    
+		parseBaseItemTypes(skillId, skillName);
 
-		const grantedEffect = findGrantedEffectId(skillId);
+		const grantedEffect = await findGrantedEffectId(skillId);
 		console.log('Effect', grantedEffect);
 
 		try {
@@ -345,7 +348,7 @@
 		});
 	}
 
-	function getDynamicStats() {
+	async function getDynamicStats() {
 		const skillId = rowStoreData?.Id;
 		console.log('SkillId (Dynamic)', skillId);
 
@@ -359,7 +362,7 @@
 		);
 		skillData.item_class_id_restriction = weaponRestrictionNames.join(', ');
 
-		const grantedEffect = findGrantedEffectId(skillId);
+		const grantedEffect = await findGrantedEffectId(skillId);
 		console.log('Effect (Dynamic)', grantedEffect?.Id);
 
 		const grantedEffectsPerLevel = findGrantedEffectsPerLevel(grantedEffect?.Id);
@@ -411,11 +414,27 @@
 		getStatDescriptionsForAll(Array.from(statSet));
 	}
 
-	function parseGemTags() {
+	async function parseGemTags() {
 		let grantedEffect = rowStoreData?.GrantedEffect;
+
+    // if the granted effect is empty, we need to find the granted effect from the active skill id
+    // so we need to loop over the grantedEffects and find the effect.ActiveSkill.Id that matches the active skill id
+    if (!grantedEffect) {
+      let activeSkillId = rowStoreData?.Id;
+      let activeSkill = data?.allData.GrantedEffects?.rows.find(
+        (activeSkill) => activeSkill.ActiveSkill?.Id === activeSkillId
+      );
+      console.log("GrantedEffect", activeSkill);
+      grantedEffect = activeSkill?.Id;
+    }
+
+    if (grantedEffect.includes('Player')) {
+      grantedEffect = grantedEffect.replace('Player', '');
+    }
+    
 		// find the granted effect in activeskills
 		let activeSkill = data?.allData.SkillGems?.rows.find(
-			(activeSkill) => activeSkill.GemEffects[0].Id === grantedEffect
+			(activeSkill) =>  activeSkill.GemEffects[0].Id === grantedEffect
 		);
 
 		console.log('ActiveSkill', activeSkill);
@@ -423,7 +442,7 @@
 		let gemTags = activeSkill?.GemEffects[0].GemTags;
 		let tags = gemTags.map((tag: number) => {
 			let gemTag = data?.allData.GemTags?.rows[tag];
-			console.log('GemTag', gemTag);
+			// console.log('GemTag', gemTag);
 
 			let tagName = gemTag.Name.replace(/[\[\]]/g, '');
 			tagName = tagName.includes('|') ? tagName.split('|')[1] : tagName;
@@ -434,7 +453,7 @@
 			}
 		});
 
-		console.log('Tags', tags);
+		// console.log('Tags', tags);
 		tags = tags.filter((tag: null) => tag !== null);
 
 		skillData.gem_tags = tags.join(', ');
@@ -444,9 +463,9 @@
 		console.log('Data', data);
 		console.log('RowStore', rowStoreData);
 
-		getConstantStats();
-		getDynamicStats();
-		parseGemTags();
+		await getConstantStats();
+		await getDynamicStats();
+		await parseGemTags();
 	});
 </script>
 
