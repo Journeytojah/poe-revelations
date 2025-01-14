@@ -1,33 +1,24 @@
 <script lang="ts">
-	import type { DataHandler } from '@vincjo/datatables/legacy/remote';
+	import type { DataHandler } from '@vincjo/datatables/legacy';
 	export let handler: DataHandler;
 	export let filterBy: string;
-
 	let value: string;
-	let timeout: any;
-
-	const filter = () => {
-		handler.filter(value, filterBy);
-		clearTimeout(timeout);
-		timeout = setTimeout(() => {
-			// handler.invalidate();
-		}, 400);
-	};
 </script>
 
-<th class="p-2">
+<th>
 	<input
 		class="input text-sm w-full"
 		type="text"
 		placeholder="Filter"
 		bind:value
-		on:input={filter}
+		on:input={() => {
+			if (filterBy) handler.filter(value, filterBy);
+		}}
 	/>
 </th>
 
 <style>
-	th,
-	td {
+	th {
 		width: 20vw;
 		text-align: left;
 		text-overflow: ellipsis;

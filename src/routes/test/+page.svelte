@@ -28,11 +28,14 @@
 	//Import handler from SSD
 	import { DataHandler } from '@vincjo/datatables/legacy';
 	import { rowStore } from '$lib/stores/rowStore.js';
+  
+  let handler: DataHandler;
+  let rows;
 
-	//Init data handler - CLIENT
-	// const handler = new DataHandler(data.rows, { rowsPerPage: 10 });
-	const handler: DataHandler = new DataHandler(data.rows, { rowsPerPage: 10 });
-	const rows = handler.getRows();
+  $: {
+    handler = new DataHandler(data.rows, { rowsPerPage: 10 });
+    rows = handler.getRows();
+  }
 
 	function displayValue(value: any): string {
 		// Check if the value is an object or an array
@@ -83,16 +86,15 @@
 		});
 	}
 
-	function selectTable():
-		| import('svelte/elements').MouseEventHandler<HTMLButtonElement>
-		| null
-		| undefined {
-		return (event) => {
+	function selectTable() {
+		return (event: { target: HTMLButtonElement; }) => {
 			loading = true;
 			const version = selectedVersion;
 			const target = event.target as HTMLButtonElement;
 			const table = target.innerText.split('.')[0];
-			goto(`?version=${version}&table=${table}`);
+			goto(`?version=${version}&table=${table}`).then(() => {
+        loading = false;
+      });
 		};
 	}
 

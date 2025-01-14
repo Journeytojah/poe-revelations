@@ -1,17 +1,13 @@
 <script lang="ts">
-	import type { DataHandler } from '@vincjo/datatables/legacy/remote';
+	import type { DataHandler } from '@vincjo/datatables/legacy';
 	export let handler: DataHandler;
 	const rowsPerPage = handler.getRowsPerPage();
 	const options = [5, 10, 20, 50, 100];
-	const setRowsPerPage = () => {
-		handler.setPage(1);
-		// handler.invalidate();
-	};
 </script>
 
 <aside class="flex place-items-center">
 	Show
-	<select class="select ml-2" bind:value={$rowsPerPage} on:change={setRowsPerPage}>
+	<select class="select ml-2" bind:value={$rowsPerPage}>
 		{#each options as option}
 			<option value={option}>
 				{option}
