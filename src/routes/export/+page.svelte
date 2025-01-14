@@ -35,6 +35,8 @@
 		metadata_id: '',
 		help_text: 'Skills can be managed in the Skills Panel.',
 		intelligence_percent: 0,
+    strength_percent: 0,
+    dexterity_percent: 0,
 		gem_tags: '',
 		gem_description: '',
 		active_skill_name: '',
@@ -44,16 +46,12 @@
 		required_level: 1,
 		static_cost_types: '',
 		// TODO: format crit to 2 decimal places and %
-		static_critical_strike_chance: '',
+		static_critical_strike_chance: 0.0,
 		stat_text: '',
 		//
 		gem_tier: 0
 	};
 
-	// $: console.log('SkillData', skillData);
-
-	// Mocked RowStore
-	// const rowStoreData = mockData;
 	const rowStoreData = get(rowStore);
 
 	// Stat Set to store unique statId and values
@@ -277,6 +275,8 @@
 
 		console.log('SkillGem', skillGem);
 		skillData.intelligence_percent = skillGem?.IntelligenceRequirementPercent;
+    skillData.strength_percent = skillGem?.StrengthRequirementPercent;
+    skillData.dexterity_percent = skillGem?.DexterityRequirementPercent;
 		skillData.gem_tier = skillGem?.CraftingLevel;
 	}
 
@@ -325,7 +325,7 @@
 	}
 
 	function findGrantedEffectStatSetPerLevel(skillId: string) {
-		console.log('GrantedEffectsStatSetsPerLevel', grantedEffectsStatSetsPerLevel);
+		// console.log('GrantedEffectsStatSetsPerLevel', grantedEffectsStatSetsPerLevel);
 
 		return grantedEffectsStatSetsPerLevel.find((effect) => {
 			try {
@@ -374,9 +374,7 @@
 			grantedEffectStatSetPerLevel?.AttackCritChance ||
 			grantedEffectStatSetPerLevel?.SpellCritChance;
 		// add a % sign
-		skillData.static_critical_strike_chance = critChance
-			? `${(critChance / 100).toFixed(2)}%`
-			: '0%';
+		skillData.static_critical_strike_chance = critChance / 100;
 
 		const additionalStats = grantedEffectStatSetPerLevel?.AdditionalStats || [];
 		const additionalStatsValues = grantedEffectStatSetPerLevel?.AdditionalStatsValues || [];
@@ -436,26 +434,31 @@
 		let activeSkill = data?.allData.SkillGems?.rows.find(
 			(activeSkill) =>  activeSkill.GemEffects[0].Id === grantedEffect
 		);
+    
 
-		console.log('ActiveSkill', activeSkill);
+		if (!activeSkill || !activeSkill.GemEffects?.[0]?.GemTags) {
+			console.error('ActiveSkill or GemTags is undefined');
+			skillData.gem_tags = ''; // Default to an empty string if no tags are found
+			return;
+		}
 
-		let gemTags = activeSkill?.GemEffects[0].GemTags;
+		let gemTags = activeSkill.GemEffects[0].GemTags;
+
+		// Map over gemTags safely
 		let tags = gemTags.map((tag: number) => {
-			let gemTag = data?.allData.GemTags?.rows[tag];
-			// console.log('GemTag', gemTag);
+			let gemTag = data?.allData.GemTags?.rows?.[tag];
+			if (!gemTag) return null; // Skip undefined gemTag
 
 			let tagName = gemTag.Name.replace(/[\[\]]/g, '');
 			tagName = tagName.includes('|') ? tagName.split('|')[1] : tagName;
-			if (tagName !== '') {
-				return tagName;
-			} else {
-				return null;
-			}
+
+			return tagName !== '' ? tagName : null;
 		});
 
-		// console.log('Tags', tags);
+		// Filter out null values
 		tags = tags.filter((tag: null) => tag !== null);
 
+		// Join tags into a string
 		skillData.gem_tags = tags.join(', ');
 	}
 
