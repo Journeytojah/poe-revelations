@@ -38,25 +38,74 @@
 	}
 
 	function displayValue(value: any): string {
-		// Check if the value is an object or an array
-		if (value && typeof value === 'object') {
-			return JSON.stringify(value, null, 2); // Pretty-print objects and arrays
+		// Helper to render key-value pairs
+		function renderObject(obj: Record<string, any>): string {
+			return `
+      <table class="min-w-full border border-gray-200 text-sm text-left table-fixed w-[10vw] overflow-hidden">
+        ${Object.entries(obj)
+					.map(
+						([key, val]) => `
+          <tr class="w-[10vw] overflow-hidden">
+            <th class="p-2 font-medium border-b">${key}</th>
+            <td class="p-2 border-b">${displayValue(val)}</td>
+          </tr>
+        `
+					)
+					.join('')}
+      </table>
+    `;
 		}
 
-		// Check if the value is a stringified JSON object
+		// Handle arrays
+		function renderArray(arr: any[]): string {
+			return `
+      <ul class="p-4">
+        ${arr
+					.map(
+						(item) => `
+          <li>${displayValue(item)}</li>
+        `
+					)
+					.join('')}
+      </ul>
+    `;
+		}
+
+		// Render different data types
+		if (value === null || value === undefined) {
+			return `<span class="text-gray-500 italic">null</span>`;
+		}
+
+		if (typeof value === 'boolean') {
+			return `<span class="badge ${value ? 'bg-green-600' : 'bg-red-600'}">${value}</span>`;
+		}
+
+		if (typeof value === 'number') {
+			return `<span class="text-blue-500">${value}</span>`;
+		}
+
+		if (Array.isArray(value)) {
+			return renderArray(value);
+		}
+
+		if (typeof value === 'object') {
+			return renderObject(value);
+		}
+
+		// Handle stringified JSON
 		if (typeof value === 'string') {
 			try {
 				const parsed = JSON.parse(value);
-				if (typeof parsed === 'object' && parsed !== null) {
-					return JSON.stringify(parsed, null, 2);
+				if (typeof parsed === 'object') {
+					return displayValue(parsed);
 				}
 			} catch (e) {
-				// If parsing fails, return the original string
+				// Not a JSON string, fall through
 			}
 		}
 
-		// Return primitive values as is
-		return String(value);
+		// Handle strings and other primitives
+		return `<span>${value}</span>`;
 	}
 
 	function handleVersionChange(event: Event) {
@@ -243,7 +292,7 @@
 
 	th,
 	td {
-		width: 20vw;
+		width: 30vw;
 		text-align: left;
 		text-overflow: ellipsis;
 		white-space: normal;

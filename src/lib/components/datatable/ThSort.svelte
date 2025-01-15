@@ -24,7 +24,7 @@
 
 <style>
 	th {
-		width: 20vw;
+		width: 30vw;
 		text-align: left;
 		text-overflow: ellipsis;
 		white-space: normal;
