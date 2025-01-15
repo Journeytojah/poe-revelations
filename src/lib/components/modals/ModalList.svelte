@@ -8,8 +8,8 @@
 	export let parent: SvelteComponent;
 
 	// Local
-  // TODO: This is a placeholder for a form submission
-  // UNGADOOSH later.
+	// TODO: This is a placeholder for a form submission
+	// UNGADOOSH later.
 	let flavor = 'gadoosh';
 	const modalStore = getModalStore();
 
@@ -20,7 +20,7 @@
 	}
 
 	// Base Classes
-	const cBase = 'card p-4 w-modal shadow-xl space-y-4';
+	const cBase = 'card p-4 w-full shadow-xl space-y-4';
 	const cHeader = 'text-2xl font-bold';
 </script>
 
@@ -29,7 +29,7 @@
 {#if $modalStore[0]}
 	<div class="modal-example-form {cBase}">
 		<header class={cHeader}>{$modalStore[0].title ?? '(title missing)'}</header>
-		<article>{$modalStore[0].body ?? '(body missing)'}</article>
+		<article>{@html $modalStore[0].body ?? '(body missing)'}</article>
 		<!-- <ListBox class="border border-surface-500 p-4 rounded-container-token">
 			<ListBoxItem bind:group={flavor} name="chocolate" value="chocolate">Chocolate</ListBoxItem>
 			<ListBoxItem bind:group={flavor} name="vanilla" value="vanilla">Vanilla</ListBoxItem>

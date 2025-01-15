@@ -45,7 +45,7 @@
         ${Object.entries(obj)
 					.map(
 						([key, val]) => `
-          <tr class="w-[10vw] overflow-hidden">
+          <tr class="w-auto overflow-hidden">
             <th class="p-2 font-medium border-b">${key}</th>
             <td class="p-2 border-b">${displayValue(val)}</td>
           </tr>
@@ -59,7 +59,7 @@
 		// Handle arrays
 		function renderArray(arr: any[]): string {
 			return `
-      <ul class="p-4">
+      <ul class="">
         ${arr
 					.map(
 						(item) => `
@@ -120,7 +120,7 @@
 				type: 'component',
 				component: 'list',
 				title: 'Row Data',
-				body: prepareBodyData(row),
+				body: displayValue(row),
 				response: (r: boolean) => {
 					resolve(r);
 				}
@@ -145,42 +145,6 @@
 				loading = false;
 			});
 		};
-	}
-
-	function prepareBodyData(row: any): string {
-		// Recursive function to parse stringified JSON values
-		function parseValue(value: any): any {
-			if (typeof value === 'string') {
-				try {
-					const parsed = JSON.parse(value);
-					return parseValue(parsed); // Recursively parse in case of nested JSON strings
-				} catch (e) {
-					return value; // Return the original value if parsing fails
-				}
-			} else if (typeof value === 'object' && value !== null) {
-				// If it's an object or array, recursively process each key or element
-				if (Array.isArray(value)) {
-					return value.map(parseValue);
-				} else {
-					return Object.fromEntries(
-						Object.entries(value).map(([key, val]) => [key, parseValue(val)])
-					);
-				}
-			}
-			return value; // Return primitive values as is
-		}
-
-		const parsedRow = parseValue(row);
-
-		// Build the string representation
-		console.log('parsedRow:', parsedRow);
-
-		return Object.entries(parsedRow)
-			.map(
-				([key, value]) =>
-					`${key}: ${typeof value === 'object' ? JSON.stringify(value, null, 2) : value}`
-			)
-			.join('\n');
 	}
 </script>
 
