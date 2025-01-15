@@ -150,7 +150,7 @@
 			</select>
 			<p>Current patch: {data.versionNumber}</p>
 			{#if data.tableName !== undefined}
-				<h3 class="h3 py-4 text-wrap">Selected table: {data.tableName}</h3>
+				<h5 class="h5 py-4 text-wrap">Selected table: {data.tableName}</h5>
 			{/if}
 		</div>
 
@@ -171,7 +171,7 @@
 			<p>No .datc64 files found in the directory.</p>
 		{/if}
 	</div>
-	<div class="relative w-10/12">
+	<div class="relative w-10/12 overflow-hidden">
 		{#if loading}
 			<div class="absolute inset-0 flex flex-col items-center justify-center">
 				<div class="freeloader">
@@ -185,11 +185,11 @@
 		{:else if data.rows.length === 0}
 			<p class="text-center mt-12">No data found for the selected table or no table selected.</p>
 		{:else}
-			<div class="table-container max-h-[100vh] relative">
-				<header class="flex justify-between gap-4">
-					<Search {handler} />
-					<RowsPerPage {handler} />
-				</header>
+			<header class="flex justify-between gap-4 p-4">
+				<Search {handler} />
+				<RowsPerPage {handler} />
+			</header>
+			<div class="table-container max-h-[80vh] relative">
 				<div class="sticky top-0 rounded">
 					<table>
 						<thead>
@@ -212,7 +212,7 @@
 					<tbody>
 						{#each $rows as row, index}
 							<tr on:click={() => selectRow(row)}>
-								<td class=" p-2 rowCount">
+								<td class="p-2 rowCount">
 									{index}
 								</td>
 
@@ -225,11 +225,11 @@
 						{/each}
 					</tbody>
 				</table>
-				<footer class="flex justify-between">
-					<RowCount {handler} />
-					<Pagination {handler} />
-				</footer>
 			</div>
+			<footer class="flex justify-between p-2">
+				<RowCount {handler} />
+				<Pagination {handler} />
+			</footer>
 		{/if}
 	</div>
 </div>

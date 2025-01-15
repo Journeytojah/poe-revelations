@@ -10,9 +10,23 @@ export async function fetchSchema(fetch: (input: RequestInfo | URL) => Promise<R
 }
 
 export function findTable(schema: SchemaFile, tableName: string, version: string): SchemaTable | null {
+  if (!version || isNaN(parseInt(version, 10))) {
+    console.error("Invalid version:", version);
+    return null;
+  }
+
   const versionNumber = parseInt(version, 10);
-  return schema?.tables.find((t) => {
-    const tableNameMatches = new RegExp(`^${tableName}$`, 'i').test(t.name);
-    return tableNameMatches && (t.validFor === versionNumber || t.validFor === 3);
-  }) || null;
+
+  return (
+    schema?.tables.find((t) => {
+      const tableNameMatches = new RegExp(`^${tableName}$`, 'i').test(t.name);
+      const versionMatches = t.validFor === versionNumber || t.validFor === 3;
+
+      if (tableNameMatches && versionMatches) {
+        // console.log("Matched table:", t.name, "Valid for version:", t.validFor);
+      }
+
+      return tableNameMatches && versionMatches;
+    }) || null
+  );
 }
