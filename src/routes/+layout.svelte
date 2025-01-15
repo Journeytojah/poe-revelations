@@ -17,25 +17,22 @@
 	hljs.registerLanguage('typescript', typescript);
 	storeHighlightJs.set(hljs);
 
-  import ModalList from '$lib/components/modals/ModalList.svelte'
-  import ModalFullscreen from '$lib/components/modals/ModalFullscreen.svelte'
+	import ModalList from '$lib/components/modals/ModalList.svelte';
+	import ModalFullscreen from '$lib/components/modals/ModalFullscreen.svelte';
 
-  const modalRegistry: Record<string, ModalComponent> = {
-    list: { ref: ModalList},
-    fullscreen: { ref: ModalFullscreen}
-  };
+	const modalRegistry: Record<string, ModalComponent> = {
+		list: { ref: ModalList },
+		fullscreen: { ref: ModalFullscreen }
+	};
 
 	// Floating UI for Popups
 	import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
 	import { storePopup } from '@skeletonlabs/skeleton';
 	storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
 
-  initializeStores();
-
+	initializeStores();
 </script>
 
-<Modal padding='p-0' components={modalRegistry}/>
+<Modal padding="p-0" components={modalRegistry} />
 
-  <slot />
-
-
+<slot />

@@ -16,7 +16,7 @@
 	export let data;
 	let headers: string[] = [];
 	let selectedVersion = data.selectedVersion || '1';
-	let loading: boolean = true;
+	let loading: boolean = false;
 
 	$: headers = data.headers.map((header) => header.name || `Column`);
 	$: {
@@ -28,14 +28,14 @@
 	//Import handler from SSD
 	import { DataHandler } from '@vincjo/datatables/legacy';
 	import { rowStore } from '$lib/stores/rowStore.js';
-  
-  let handler: DataHandler;
-  let rows;
 
-  $: {
-    handler = new DataHandler(data.rows, { rowsPerPage: 10 });
-    rows = handler.getRows();
-  }
+	let handler: DataHandler;
+	let rows;
+
+	$: {
+		handler = new DataHandler(data.rows, { rowsPerPage: 10 });
+		rows = handler.getRows();
+	}
 
 	function displayValue(value: any): string {
 		// Check if the value is an object or an array
@@ -87,14 +87,14 @@
 	}
 
 	function selectTable() {
-		return (event: { target: HTMLButtonElement; }) => {
+		return (event: MouseEvent) => {
 			loading = true;
 			const version = selectedVersion;
 			const target = event.target as HTMLButtonElement;
 			const table = target.innerText.split('.')[0];
 			goto(`?version=${version}&table=${table}`).then(() => {
-        loading = false;
-      });
+				loading = false;
+			});
 		};
 	}
 
@@ -183,7 +183,7 @@
 				<sub class="text-xs">Giggity</sub>
 			</div>
 		{:else if data.rows.length === 0}
-			<p>No data found for the selected table.</p>
+			<p class="text-center mt-12">No data found for the selected table or no table selected.</p>
 		{:else}
 			<div class="table-container max-h-[100vh] relative">
 				<header class="flex justify-between gap-4">
