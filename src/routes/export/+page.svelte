@@ -53,7 +53,7 @@
 		// TODO: format crit to 2 decimal places and %
 		static_critical_strike_chance: 0.0,
 		stat_text: '',
-    progression_text: '',
+		progression_text: '',
 		//
 		gem_tier: 0,
 
@@ -119,11 +119,9 @@
 		return blocks;
 	}
 
-  
-
 	async function getStatDescriptionsForAll(
 		statSet: { id: string; value: number }[],
-    skipSame: boolean = true
+		skipSame: boolean = true
 	) {
 		console.log('StatSet:', statSet);
 
@@ -267,8 +265,8 @@
 		});
 
 		// Join all rendered descriptions into skillData.stat_text
-		skillData.stat_text = allRenderedDescriptions.join('<br>');
-		console.log('📜 Final Stat Text:', skillData.stat_text);
+		// skillData.stat_text = allRenderedDescriptions.join('<br>');
+		// console.log('📜 Final Stat Text:', skillData.stat_text);
 		return allRenderedDescriptions;
 	}
 
@@ -408,6 +406,7 @@
 		// for each stat in the statSet, we need to get the stat description
 
 		const statDescriptions = await getStatDescriptionsForAll(Array.from(statSetProgression), false);
+		skillData.progression_text = statDescriptions?.join('<br>') || '';
 		// console.log('StatDescriptions:', statDescriptions);
 
 		// TODO: handle life and mana cost amounts
@@ -494,15 +493,15 @@
 			// up to level 20 is true, after that is false
 
 			let text = `
-    |level${index + 1} = ${index < 20 ? 'True' : 'False'}
-    |level${index + 1}_level_requirement = ${gemProgression.levels[index]}
-    |level${index + 1}_intelligence_requirement = ${gemProgression.stat[index]}
-    |level${index + 1}_cost_amounts = ${gemProgression.cost[index]}
-    |level${index + 1}_stat_text = ${gemProgression.statDescriptions?.[index]}
-    |level${index + 1}_stat1_id = ${gemProgression.floatStats[index][0].id}
-    |level${index + 1}_stat1_value = ${gemProgression.floatStats[index][0].value}
-    |level${index + 1}_stat2_id = ${gemProgression.floatStats[index][1].id}
-    |level${index + 1}_stat2_value = ${gemProgression.floatStats[index][1].value}
+|level${index + 1} = ${index < 20 ? 'True' : 'False'}
+|level${index + 1}_level_requirement = ${gemProgression.levels[index]}
+|level${index + 1}_intelligence_requirement = ${gemProgression.stat[index]}
+|level${index + 1}_cost_amounts = ${gemProgression.cost[index]}
+|level${index + 1}_stat_text = ${gemProgression.statDescriptions?.[index]}
+|level${index + 1}_stat1_id = ${gemProgression.floatStats[index][0].id}
+|level${index + 1}_stat1_value = ${gemProgression.floatStats[index][0].value}
+|level${index + 1}_stat2_id = ${gemProgression.floatStats[index][1].id}
+|level${index + 1}_stat2_value = ${gemProgression.floatStats[index][1].value}
     `;
 
 			finalProgression.push(text);
@@ -557,7 +556,8 @@
 
 		// console.log('📊 Collected Float StatSet:', Array.from(statSet));
 
-		getStatDescriptionsForAll(Array.from(statSet));
+		const statText = await getStatDescriptionsForAll(Array.from(statSet));
+    skillData.stat_text = statText?.join('<br>') || '';
 	}
 
 	async function parseGemTags() {
@@ -648,18 +648,18 @@ ${skillData.finalProgression.join('\n')}
 `;
 	});
 
-
 	function copyToClipboard(): any {
-	// copy wiki text to clipboard
-    navigator.clipboard.writeText(wikitext);
+		// copy wiki text to clipboard
+		navigator.clipboard.writeText(wikitext);
 	}
 </script>
 
 <h1>Export Page</h1>
-<p>{message = "This page is under construction. Shit is krangled"}</p>
-
+<p>{(message = 'This page is under construction. Shit is krangled')}</p>
 
 <h2>Generated Wikitext:</h2>
-<button class="btn variant-filled-success" on:click={() => copyToClipboard()}>Copy to clipboard</button>
+<button class="btn variant-filled-success" on:click={() => copyToClipboard()}
+	>Copy to clipboard</button
+>
 
 <pre>{wikitext}</pre>
