@@ -205,7 +205,7 @@
 
 			// Render descriptions for each progression step
 			values.forEach((_, index) => {
-				const renderedDescriptions = descriptionBlock.descriptions.map((desc) => {
+				let renderedDescriptions = descriptionBlock.descriptions.map((desc) => {
 					let result = desc;
 
 					// Replace placeholders ({0}, {1}, ...) with progression values
@@ -256,6 +256,11 @@
 
 					return result;
 				});
+
+        // remove all the # from the descriptions
+        renderedDescriptions = renderedDescriptions.map((desc) => desc.replace(/#/g, ''));
+        // remove the quotes from the descriptions
+        renderedDescriptions = renderedDescriptions.map((desc) => desc.replace(/"/g, ''));
 
 				// Add rendered descriptions to the collection
 				allRenderedDescriptions.push(...renderedDescriptions);
