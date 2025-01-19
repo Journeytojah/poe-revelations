@@ -23,42 +23,10 @@
 	const grantedEffectStatSets = data?.allData.GrantedEffectStatSets?.rows || [];
 	const grantedEffectsStatSetsPerLevel = data?.allData.GrantedEffectStatSetsPerLevel?.rows || [];
 
-	//     |level1 = True
-	// |level1_level_requirement = 1
-	// |level1_intelligence_requirement = 1
-	// |level1_cost_amounts = 18
-	// |level1_stat_text = Deals 37 to 56 Cold Damage
-	// |level1_stat1_id = spell_minimum_base_cold_damage
-	// |level1_stat1_value = 37
-	// |level1_stat2_id = spell_maximum_base_cold_damage
-	// |level1_stat2_value = 56
-
-	// |level2 = True
-	// |level2_level_requirement = 3
-	// |level2_intelligence_requirement = 9
-	// |level2_cost_amounts = 21
-	// |level2_stat_text = Deals 51 to 76 Cold Damage
-	// |level2_stat1_id = spell_minimum_base_cold_damage
-	// |level2_stat1_value = 51
-	// |level2_stat2_id = spell_maximum_base_cold_damage
-	// |level2_stat2_value = 76
-
 	// prepare the gem progression object
 	// do a loop and create the empty objects for each level from 1 to 40
 
-	let gemProgression = Array.from({ length: 40 }, (_, i) => {
-		const level = i + 1;
-		return `|level${level} = True
-|level${level}_level_requirement = 1
-|level${level}_intelligence_requirement = 1
-|level${level}_cost_amounts = 1
-|level${level}_stat_text = ''
-|level${level}_stat1_id = ''
-|level${level}_stat1_value = 0
-|level${level}_stat2_id = ''
-|level${level}_stat2_value = 0
-`;
-	}).join('');
+	let finalProgression = [];
 
 	// Create an object to store the data so we can generate the wikitext later
 	const skillData = {
@@ -85,17 +53,18 @@
 		// TODO: format crit to 2 decimal places and %
 		static_critical_strike_chance: 0.0,
 		stat_text: '',
+    progression_text: '',
 		//
 		gem_tier: 0,
 
 		// gem progression goes here
-		gemProgression
+		finalProgression: finalProgression
 	};
 
 	const rowStoreData = get(rowStore);
 
 	// Stat Set to store unique statId and values
-	const statSet = new Set<{ id: string; value: number }>();
+	let statSet = new Set<{ id: string; value: number }>();
 
 	async function findGrantedEffectId(skillId: string) {
 		return grantedEffects.find((effect) => {
@@ -150,7 +119,14 @@
 		return blocks;
 	}
 
-	async function getStatDescriptionsForAll(statSet: { id: string; value: number }[]) {
+  
+
+	async function getStatDescriptionsForAll(
+		statSet: { id: string; value: number }[],
+    skipSame: boolean = true
+	) {
+		console.log('StatSet:', statSet);
+
 		if (!statSet || statSet.length === 0) {
 			console.warn('⚠️ No stats to fetch.');
 			return;
@@ -166,14 +142,25 @@
 		// Parse descriptions into structured blocks
 		const parsedBlocks = parseStatDescriptions(statDescriptions);
 
-		// Track stats that have been processed
+		// Group stats by id
+		const groupedStats = statSet.reduce(
+			(acc, { id, value }) => {
+				if (!acc[id]) {
+					acc[id] = [];
+				}
+				acc[id].push(value);
+				return acc;
+			},
+			{} as Record<string, number[]>
+		);
+
+		// Process stats
 		const processedStats = new Set<string>();
 		const allRenderedDescriptions: string[] = []; // Collect all descriptions
 
-		// Process each stat in the passed statSet
-		statSet.forEach(({ id, value }) => {
-			// Avoid processing the same stat multiple times
-			if (processedStats.has(id)) {
+		Object.entries(groupedStats).forEach(([id, values]) => {
+			// Skip processing if the stat has already been processed and skipSame is true
+			if (skipSame && processedStats.has(id)) {
 				return;
 			}
 
@@ -192,8 +179,8 @@
 				return;
 			}
 
-			// console.log('🔍 Matched Block:', descriptionBlock);
-			// console.log('Value:', value);
+			console.log('🔍 Matched Block:', descriptionBlock);
+			console.log('Values:', values);
 
 			// Process stats in multi-stat blocks
 			let blockStats = descriptionBlock.stats.flatMap((stat) =>
@@ -203,87 +190,86 @@
 			// Remove numeric-only prefixes from blockStats
 			blockStats = blockStats.filter((stat) => !/^\d+$/.test(stat));
 
-			const blockValues: number[] = [];
+			const blockValues: number[][] = [];
 
-			// Match stats with their values from statSet
+			// Match stats with their values from groupedStats
 			blockStats.forEach((statId) => {
-				const statEntry = statSet.find((s) => s.id === statId);
-				if (statEntry) {
-					blockValues.push(statEntry.value);
+				if (groupedStats[statId]) {
+					blockValues.push(groupedStats[statId]);
 					processedStats.add(statId); // Mark as processed
 				} else {
-					blockValues.push(0); // Default if not found
+					blockValues.push([0]); // Default if not found
 				}
 			});
 
-			// console.log('🔄 Block Stats:', blockStats);
-			// console.log('💡 Block Values:', blockValues);
+			console.log('🔄 Block Stats:', blockStats);
+			console.log('💡 Block Values:', blockValues);
 
-			// Render descriptions
-			const renderedDescriptions = descriptionBlock.descriptions.map((desc) => {
-				let result = desc;
+			// Render descriptions for each progression step
+			values.forEach((_, index) => {
+				const renderedDescriptions = descriptionBlock.descriptions.map((desc) => {
+					let result = desc;
 
-				// Handle each placeholder ({0}, {1}, ...)
-				blockValues.forEach((blockValue, index) => {
-					let renderedValue: number = blockValue;
-					let renderedText: string = blockValue.toString();
+					// Replace placeholders ({0}, {1}, ...) with progression values
+					blockValues.forEach((statProgression, idx) => {
+						const value = statProgression[index] || 0;
+						let renderedValue: number = value;
+						let renderedText: string = value.toString();
 
-					// Handle conversion: milliseconds → seconds with 2 decimal places
-					if (desc.includes('milliseconds_to_seconds_2dp_if_required')) {
-						renderedValue = parseFloat((blockValue / 1000).toFixed(2));
-						renderedText = renderedValue.toString();
+						// Handle specific transformations
+						if (desc.includes('milliseconds_to_seconds_2dp_if_required')) {
+							renderedValue = parseFloat((value / 1000).toFixed(2));
+							renderedText = renderedValue.toString();
+						}
+
+						if (desc.includes('per_minute_to_per_second')) {
+							renderedValue = parseFloat((value / 60).toFixed(1));
+							renderedText = renderedValue.toString();
+						}
+
+						if (desc.includes('divide_by_ten_1dp_if_required')) {
+							renderedValue = parseFloat((value / 10).toFixed(1));
+							renderedText = renderedValue.toString();
+						}
+
+						if (desc.includes(`{${idx}:+d}`)) {
+							renderedText = value >= 0 ? `+${value}` : `${value}`;
+							result = result.replace(new RegExp(`\\{${idx}\\:\\+d\\}`, 'g'), renderedText);
+						} else {
+							result = result.replace(new RegExp(`\\{${idx}\\}`, 'g'), renderedText);
+						}
+					});
+
+					// Handle singular/plural placeholders
+					if (result.includes('[Projectile|Projectiles]')) {
+						const pluralSuffix = blockValues[0][index] === 1 ? 'Projectile' : 'Projectiles';
+						result = result.replace('[Projectile|Projectiles]', pluralSuffix);
 					}
 
-					// Handle conversion: per minute → per second
-					if (desc.includes('per_minute_to_per_second')) {
-						renderedValue = parseFloat((blockValue / 60).toFixed(1));
-						renderedText = renderedValue.toString();
-					}
+					// Handle static replacements
+					result = result.replace('[Chaos|Chaos]', 'Chaos').replace('[Lightning]', 'Lightning');
 
-					// Handle division by 10 if includes divide_by_ten_1dp_if_required
-					if (desc.includes('divide_by_ten_1dp_if_required')) {
-						renderedValue = parseFloat((blockValue / 10).toFixed(1));
-						renderedText = renderedValue.toString();
-					}
+					// Remove leftover directives
+					result = result
+						.replace(/milliseconds_to_seconds_2dp_if_required/g, '')
+						.replace(/per_minute_to_per_second/g, '')
+						.replace(/\s{2,}/g, ' ') // Clean extra spaces
+						.trim();
 
-					// Handle signed formatting "{0:+d}"
-					if (desc.includes(`{${index}:+d}`)) {
-						renderedText = blockValue >= 0 ? `+${blockValue}` : `${blockValue}`;
-						result = result.replace(new RegExp(`\\{${index}\\:\\+d\\}`, 'g'), renderedText);
-					} else {
-						// Regular placeholder replacement
-						result = result.replace(new RegExp(`\\{${index}\\}`, 'g'), renderedText);
-					}
+					return result;
 				});
 
-				// Handle `[Projectile|Projectiles]` for singular/plural
-				if (result.includes('[Projectile|Projectiles]')) {
-					const pluralSuffix = blockValues[0] === 1 ? 'Projectile' : 'Projectiles';
-					result = result.replace('[Projectile|Projectiles]', pluralSuffix);
-				}
+				// Add rendered descriptions to the collection
+				allRenderedDescriptions.push(...renderedDescriptions);
 
-				// Handle static replacements
-				result = result.replace('[Chaos|Chaos]', 'Chaos').replace('[Lightning]', 'Lightning');
-
-				// Remove leftover directives
-				result = result
-					.replace(/milliseconds_to_seconds_2dp_if_required/g, '')
-					.replace(/per_minute_to_per_second/g, '')
-					.replace(/\s{2,}/g, ' ') // Clean extra spaces
-					.trim();
-
-				return result;
+				console.log('📝 Rendered Descriptions for Level:', index, renderedDescriptions);
 			});
-
-			// Add rendered descriptions to the collection
-			allRenderedDescriptions.push(...renderedDescriptions);
-
-			// console.log('📝 Rendered Descriptions:', renderedDescriptions);
 		});
 
 		// Join all rendered descriptions into skillData.stat_text
 		skillData.stat_text = allRenderedDescriptions.join('<br>');
-		// console.log('📜 Final Stat Text:', skillData.stat_text);
+		console.log('📜 Final Stat Text:', skillData.stat_text);
+		return allRenderedDescriptions;
 	}
 
 	// ✅ Build a Set of Valid Tags from GemTags
@@ -388,56 +374,65 @@
 		});
 	}
 
-  function findGemProgression(grantedEffectId: string) {
-    const progression = grantedEffectsStatSetsPerLevel.filter(
-      (effect) => effect.StatSet.Id === grantedEffectId
-    );
+	async function findGemProgression(grantedEffectId: string) {
+		const progression = grantedEffectsStatSetsPerLevel.filter(
+			(effect) => effect.StatSet.Id === grantedEffectId
+		);
 
-    console.log('Progression:', progression);
+		// console.log('Progression:', progression);
 
-    const progression2 = grantedEffectsPerLevel.filter(
-      (effect) => effect.GrantedEffect.Id === grantedEffectId
-    );
+		const progression2 = grantedEffectsPerLevel.filter(
+			(effect) => effect.GrantedEffect.Id === grantedEffectId
+		);
 
-    console.log('Progression2:', progression2);
+		// console.log('Progression2:', progression2);
 
-    let floatStats = progression.map((effect) => effect.FloatStats);
-    // return the Ids
-    floatStats = floatStats.map((stats) => stats.map((stat) => stat.Id));
-    const baseResolvedValues = progression.map((effect) => effect.BaseResolvedValues);
+		let floatStats = progression.map((effect) => effect.FloatStats);
+		// return the Ids
+		floatStats = floatStats.map((stats) => stats.map((stat) => stat.Id));
+		const baseResolvedValues = progression.map((effect) => effect.BaseResolvedValues);
 
-    // now we need to combine the two arrays (floatStats and baseResolvedValues) into one array of objects
-    floatStats = floatStats.map((stats, index) => {
-      return stats.map((stat, i) => {
-        return {
-          id: stat,
-          value: baseResolvedValues[index][i]
-        }
-      });
-    });
+		// now we need to combine the two arrays (floatStats and baseResolvedValues) into one array of objects
+		floatStats = floatStats.map((stats, index) => {
+			return stats.map((stat, i) => {
+				return {
+					id: stat,
+					value: baseResolvedValues[index][i]
+				};
+			});
+		});
 
-    // TODO: handle life and mana cost amounts
-    const costAmounts = progression2.map((effect) => effect.CostAmounts[0]);
+		// console.log('FloatStats:', floatStats);
+		const statSetProgression = new Set(floatStats.flat());
+		// console.log('StatSet:', statSet);
+		// for each stat in the statSet, we need to get the stat description
 
-    const statProgression = progression.map((effect) => {
-      // TODO: handle dex and str requirements
-      return getLevelAttrRequirements(
-        Math.floor(effect.ActorLevel),
-        skillData.intelligence_percent
-      );
-    });
+		const statDescriptions = await getStatDescriptionsForAll(Array.from(statSetProgression), false);
+		// console.log('StatDescriptions:', statDescriptions);
 
-    const actorLevels = progression.map((effect) => Math.floor(effect.ActorLevel));
+		// TODO: handle life and mana cost amounts
+		const costAmounts = progression2.map((effect) => effect.CostAmounts[0]);
 
-    // console.log('Levels:', levels);
+		const statProgression = progression.map((effect) => {
+			// TODO: handle dex and str requirements
+			return getLevelAttrRequirements(
+				Math.floor(effect.ActorLevel),
+				skillData.intelligence_percent || skillData.strength_percent || skillData.dexterity_percent
+			);
+		});
 
-    return {
-      stat: statProgression,
-      levels: actorLevels,
-      cost: costAmounts,
-      floatStats: floatStats,
-    }
-  }
+		const actorLevels = progression.map((effect) => Math.floor(effect.ActorLevel));
+
+		// console.log('Levels:', levels);
+
+		return {
+			stat: statProgression,
+			levels: actorLevels,
+			cost: costAmounts,
+			statDescriptions: statDescriptions,
+			floatStats: floatStats
+		};
+	}
 
 	function getLevelAttrRequirements(level: number, multi: number): number {
 		if (multi === 0) {
@@ -470,9 +465,56 @@
 
 		const grantedEffectsPerLevel = findGrantedEffectsPerLevel(grantedEffect?.Id);
 		// console.log('EffectPerLevel', grantedEffectsPerLevel);
-		const gemProgression = findGemProgression(grantedEffectsPerLevel?.GrantedEffect.Id);
-    console.log('GemProgression:', gemProgression);
-    
+		const gemProgression = await findGemProgression(grantedEffectsPerLevel?.GrantedEffect.Id);
+		// console.log('GemProgression:', gemProgression);
+
+		//     |level1 = True
+		// |level1_level_requirement = 1
+		// |level1_intelligence_requirement = 1
+		// |level1_cost_amounts = 18
+		// |level1_stat_text = Deals 37 to 56 Cold Damage
+		// |level1_stat1_id = spell_minimum_base_cold_damage
+		// |level1_stat1_value = 37
+		// |level1_stat2_id = spell_maximum_base_cold_damage
+		// |level1_stat2_value = 56
+
+		gemProgression.stat.forEach((stat, index) => {
+			// console.log('Stat Progression:', stat);
+		});
+
+		gemProgression.floatStats.forEach((stat, index) => {
+			// console.log('Float Stat Progression:', stat);
+		});
+
+		gemProgression.levels.forEach((level, index) => {
+			// console.log('Level:', level);
+
+			const floatStatLength = gemProgression.floatStats[index].length;
+			// |level${index + 1} = True
+			// up to level 20 is true, after that is false
+
+			let text = `
+    |level${index + 1} = ${index < 20 ? 'True' : 'False'}
+    |level${index + 1}_level_requirement = ${gemProgression.levels[index]}
+    |level${index + 1}_intelligence_requirement = ${gemProgression.stat[index]}
+    |level${index + 1}_cost_amounts = ${gemProgression.cost[index]}
+    |level${index + 1}_stat_text = ${gemProgression.statDescriptions?.[index]}
+    |level${index + 1}_stat1_id = ${gemProgression.floatStats[index][0].id}
+    |level${index + 1}_stat1_value = ${gemProgression.floatStats[index][0].value}
+    |level${index + 1}_stat2_id = ${gemProgression.floatStats[index][1].id}
+    |level${index + 1}_stat2_value = ${gemProgression.floatStats[index][1].value}
+    `;
+
+			finalProgression.push(text);
+		});
+
+		gemProgression.cost.forEach((cost, index) => {
+			// console.log('Cost:', cost);
+		});
+
+		gemProgression.statDescriptions?.forEach((description, index) => {
+			// console.log('Stat Description:', description);
+		});
 
 		const grantedEffectStatSetPerLevel = findGrantedEffectStatSetPerLevel(grantedEffect?.Id);
 		// console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
@@ -574,12 +616,50 @@
 		await getConstantStats();
 		await getDynamicStats();
 		await parseGemTags();
+		console.log('SkillData:', skillData);
+
+		// Generate Wikitext
+		wikitext = `
+    {{Item
+|rarity_id                               = ${skillData.rarity_id}
+|name                                    = ${skillData.name}
+|class_id                                = ${skillData.class_id}
+|size_x                                  = ${skillData.size_x}
+|size_y                                  = ${skillData.size_y}
+|drop_level                              = ${skillData.drop_level}
+|tags                                    = ${skillData.tags}
+|metadata_id                             = ${skillData.metadata_id}
+|help_text                               = ${skillData.help_text}
+|intelligence_percent                    = ${skillData.intelligence_percent}
+|gem_tags                                = ${skillData.gem_tags}
+|gem_description                         = ${skillData.gem_description}
+|active_skill_name                       = ${skillData.active_skill_name}
+|skill_icon                              = ${skillData.name}
+|item_class_id_restriction               = ${skillData.item_class_id_restriction}
+|skill_id                                = ${skillData.skill_id}
+|cast_time                               = ${skillData.cast_time}
+|required_level                          = ${skillData.required_level}
+|static_cost_types                       = ${skillData.static_cost_types}
+|static_critical_strike_chance           = ${skillData.static_critical_strike_chance}
+|stat_text                               = ${skillData.stat_text}
+|gem_tier                                = ${skillData.gem_tier}
+
+${skillData.finalProgression.join('\n')}
+`;
 	});
+
+
+	function copyToClipboard(): any {
+	// copy wiki text to clipboard
+    navigator.clipboard.writeText(wikitext);
+	}
 </script>
 
 <h1>Export Page</h1>
-<p>{message}</p>
+<p>{message = "This page is under construction. Shit is krangled"}</p>
+
 
 <h2>Generated Wikitext:</h2>
-<!-- <pre>{skillData}</pre> -->
-<pre>{JSON.stringify(skillData, null, 2)}</pre>
+<button class="btn variant-filled-success" on:click={() => copyToClipboard()}>Copy to clipboard</button>
+
+<pre>{wikitext}</pre>
