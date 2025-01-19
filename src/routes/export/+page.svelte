@@ -23,6 +23,43 @@
 	const grantedEffectStatSets = data?.allData.GrantedEffectStatSets?.rows || [];
 	const grantedEffectsStatSetsPerLevel = data?.allData.GrantedEffectStatSetsPerLevel?.rows || [];
 
+	//     |level1 = True
+	// |level1_level_requirement = 1
+	// |level1_intelligence_requirement = 1
+	// |level1_cost_amounts = 18
+	// |level1_stat_text = Deals 37 to 56 Cold Damage
+	// |level1_stat1_id = spell_minimum_base_cold_damage
+	// |level1_stat1_value = 37
+	// |level1_stat2_id = spell_maximum_base_cold_damage
+	// |level1_stat2_value = 56
+
+	// |level2 = True
+	// |level2_level_requirement = 3
+	// |level2_intelligence_requirement = 9
+	// |level2_cost_amounts = 21
+	// |level2_stat_text = Deals 51 to 76 Cold Damage
+	// |level2_stat1_id = spell_minimum_base_cold_damage
+	// |level2_stat1_value = 51
+	// |level2_stat2_id = spell_maximum_base_cold_damage
+	// |level2_stat2_value = 76
+
+	// prepare the gem progression object
+	// do a loop and create the empty objects for each level from 1 to 40
+
+	let gemProgression = Array.from({ length: 40 }, (_, i) => {
+		const level = i + 1;
+		return `|level${level} = True
+|level${level}_level_requirement = 1
+|level${level}_intelligence_requirement = 1
+|level${level}_cost_amounts = 1
+|level${level}_stat_text = ''
+|level${level}_stat1_id = ''
+|level${level}_stat1_value = 0
+|level${level}_stat2_id = ''
+|level${level}_stat2_value = 0
+`;
+	}).join('');
+
 	// Create an object to store the data so we can generate the wikitext later
 	const skillData = {
 		rarity_id: 'normal',
@@ -35,8 +72,8 @@
 		metadata_id: '',
 		help_text: 'Skills can be managed in the Skills Panel.',
 		intelligence_percent: 0,
-    strength_percent: 0,
-    dexterity_percent: 0,
+		strength_percent: 0,
+		dexterity_percent: 0,
 		gem_tags: '',
 		gem_description: '',
 		active_skill_name: '',
@@ -49,7 +86,10 @@
 		static_critical_strike_chance: 0.0,
 		stat_text: '',
 		//
-		gem_tier: 0
+		gem_tier: 0,
+
+		// gem progression goes here
+		gemProgression
 	};
 
 	const rowStoreData = get(rowStore);
@@ -152,8 +192,8 @@
 				return;
 			}
 
-			console.log('🔍 Matched Block:', descriptionBlock);
-			console.log('Value:', value);
+			// console.log('🔍 Matched Block:', descriptionBlock);
+			// console.log('Value:', value);
 
 			// Process stats in multi-stat blocks
 			let blockStats = descriptionBlock.stats.flatMap((stat) =>
@@ -176,8 +216,8 @@
 				}
 			});
 
-			console.log('🔄 Block Stats:', blockStats);
-			console.log('💡 Block Values:', blockValues);
+			// console.log('🔄 Block Stats:', blockStats);
+			// console.log('💡 Block Values:', blockValues);
 
 			// Render descriptions
 			const renderedDescriptions = descriptionBlock.descriptions.map((desc) => {
@@ -238,12 +278,12 @@
 			// Add rendered descriptions to the collection
 			allRenderedDescriptions.push(...renderedDescriptions);
 
-			console.log('📝 Rendered Descriptions:', renderedDescriptions);
+			// console.log('📝 Rendered Descriptions:', renderedDescriptions);
 		});
 
 		// Join all rendered descriptions into skillData.stat_text
 		skillData.stat_text = allRenderedDescriptions.join('<br>');
-		console.log('📜 Final Stat Text:', skillData.stat_text);
+		// console.log('📜 Final Stat Text:', skillData.stat_text);
 	}
 
 	// ✅ Build a Set of Valid Tags from GemTags
@@ -255,9 +295,9 @@
 			(baseItemType) => baseItemType.Name.toLowerCase() === skillName.toLowerCase()
 		);
 
-		console.log('BaseItemType', baseItemType);
+		// console.log('BaseItemType', baseItemType);
 		// log the index of the baseitemtype
-		console.log('BaseItemTypeIndex', data?.allData.BaseItemTypes?.rows.indexOf(baseItemType));
+		// console.log('BaseItemTypeIndex', data?.allData.BaseItemTypes?.rows.indexOf(baseItemType));
 
 		skillData.metadata_id = baseItemType?.Id;
 		skillData.class_id = baseItemType?.ItemClass?.Id;
@@ -273,32 +313,32 @@
 			(skillGem) => skillGem.BaseItemType.Id === skillMetadata
 		);
 
-		console.log('SkillGem', skillGem);
+		// console.log('SkillGem', skillGem);
 		skillData.intelligence_percent = skillGem?.IntelligenceRequirementPercent;
-    skillData.strength_percent = skillGem?.StrengthRequirementPercent;
-    skillData.dexterity_percent = skillGem?.DexterityRequirementPercent;
+		skillData.strength_percent = skillGem?.StrengthRequirementPercent;
+		skillData.dexterity_percent = skillGem?.DexterityRequirementPercent;
 		skillData.gem_tier = skillGem?.CraftingLevel;
 	}
 
 	async function getConstantStats() {
 		// const skillId = mockData.Id;
 		const skillId = rowStoreData?.Id;
-		console.log('SkillId', skillId);
-    const skillName = rowStoreData?.DisplayedName;
+		// console.log('SkillId', skillId);
+		const skillName = rowStoreData?.DisplayedName;
 
-    // TODO: figure out what the deal is here with the name. It's not always the same as the displayed name but its also not always the same as the granted effect name...
-    
+		// TODO: figure out what the deal is here with the name. It's not always the same as the displayed name but its also not always the same as the granted effect name...
+
 		parseBaseItemTypes(skillId, skillName);
 
 		const grantedEffect = await findGrantedEffectId(skillId);
-		console.log('Effect', grantedEffect);
+		// console.log('Effect', grantedEffect);
 
 		try {
 			const castTime = grantedEffect?.CastTime;
 			const staticCostType = grantedEffect?.CostTypes[0]?.Id;
 			skillData.cast_time = castTime;
 			skillData.static_cost_types = staticCostType;
-			console.log('CastTime', castTime);
+			// console.log('CastTime', castTime);
 		} catch (error) {
 			console.error(`No cast time found for skillId: ${skillId}`);
 		}
@@ -306,7 +346,7 @@
 		const grantedEffectStatSet = grantedEffectStatSets.find(
 			(statSet) => statSet.Id === grantedEffect?.Id
 		);
-		console.log('EffectStatSet', grantedEffectStatSet);
+		// console.log('EffectStatSet', grantedEffectStatSet);
 
 		const constantStats = grantedEffectStatSet?.ConstantStats || [];
 		const constantStatsValues = grantedEffectStatSet?.ConstantStatsValues || [];
@@ -321,7 +361,7 @@
 			}
 		}
 
-		console.log('📊 Collected StatSet:', Array.from(statSet));
+		// console.log('📊 Collected StatSet:', Array.from(statSet));
 	}
 
 	function findGrantedEffectStatSetPerLevel(skillId: string) {
@@ -348,9 +388,72 @@
 		});
 	}
 
+  function findGemProgression(grantedEffectId: string) {
+    const progression = grantedEffectsStatSetsPerLevel.filter(
+      (effect) => effect.StatSet.Id === grantedEffectId
+    );
+
+    console.log('Progression:', progression);
+
+    const progression2 = grantedEffectsPerLevel.filter(
+      (effect) => effect.GrantedEffect.Id === grantedEffectId
+    );
+
+    console.log('Progression2:', progression2);
+
+    let floatStats = progression.map((effect) => effect.FloatStats);
+    // return the Ids
+    floatStats = floatStats.map((stats) => stats.map((stat) => stat.Id));
+    const baseResolvedValues = progression.map((effect) => effect.BaseResolvedValues);
+
+    // now we need to combine the two arrays (floatStats and baseResolvedValues) into one array of objects
+    floatStats = floatStats.map((stats, index) => {
+      return stats.map((stat, i) => {
+        return {
+          id: stat,
+          value: baseResolvedValues[index][i]
+        }
+      });
+    });
+
+    // TODO: handle life and mana cost amounts
+    const costAmounts = progression2.map((effect) => effect.CostAmounts[0]);
+
+    const statProgression = progression.map((effect) => {
+      // TODO: handle dex and str requirements
+      return getLevelAttrRequirements(
+        Math.floor(effect.ActorLevel),
+        skillData.intelligence_percent
+      );
+    });
+
+    const actorLevels = progression.map((effect) => Math.floor(effect.ActorLevel));
+
+    // console.log('Levels:', levels);
+
+    return {
+      stat: statProgression,
+      levels: actorLevels,
+      cost: costAmounts,
+      floatStats: floatStats,
+    }
+  }
+
+	function getLevelAttrRequirements(level: number, multi: number): number {
+		if (multi === 0) {
+			return 0;
+		}
+
+		// local req = round( ( 5 + ( level - 3 ) * 2.25 ) * ( multi / 100 ) ^ 0.9 ) + 4
+		const req = Math.round((5 + (level - 3) * 2.25) * (multi / 100) ** 0.9) + 4;
+
+		// Return 0 if the requirement is less than 8
+		return req < 8 ? 0 : req;
+	}
+
 	async function getDynamicStats() {
 		const skillId = rowStoreData?.Id;
-		console.log('SkillId (Dynamic)', skillId);
+		// console.log('SkillId (Dynamic)', skillId);
 
 		skillData.name = rowStoreData?.DisplayedName;
 		skillData.skill_id = rowStoreData?.Id.charAt(0).toUpperCase() + rowStoreData?.Id.slice(1);
@@ -363,13 +466,16 @@
 		skillData.item_class_id_restriction = weaponRestrictionNames.join(', ');
 
 		const grantedEffect = await findGrantedEffectId(skillId);
-		console.log('Effect (Dynamic)', grantedEffect?.Id);
+		// console.log('Effect (Dynamic)', grantedEffect?.Id);
 
 		const grantedEffectsPerLevel = findGrantedEffectsPerLevel(grantedEffect?.Id);
-		console.log('EffectPerLevel', grantedEffectsPerLevel);
+		// console.log('EffectPerLevel', grantedEffectsPerLevel);
+		const gemProgression = findGemProgression(grantedEffectsPerLevel?.GrantedEffect.Id);
+    console.log('GemProgression:', gemProgression);
+    
 
 		const grantedEffectStatSetPerLevel = findGrantedEffectStatSetPerLevel(grantedEffect?.Id);
-		console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
+		// console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
 		const critChance =
 			grantedEffectStatSetPerLevel?.AttackCritChance ||
 			grantedEffectStatSetPerLevel?.SpellCritChance;
@@ -389,7 +495,7 @@
 			}
 		}
 
-		console.log('📊 Collected Additional StatSet:', Array.from(statSet));
+		// console.log('📊 Collected Additional StatSet:', Array.from(statSet));
 
 		const floatStats = grantedEffectStatSetPerLevel?.FloatStats || [];
 		const floatStatsValues =
@@ -407,7 +513,7 @@
 			}
 		}
 
-		console.log('📊 Collected Float StatSet:', Array.from(statSet));
+		// console.log('📊 Collected Float StatSet:', Array.from(statSet));
 
 		getStatDescriptionsForAll(Array.from(statSet));
 	}
@@ -415,26 +521,25 @@
 	async function parseGemTags() {
 		let grantedEffect = rowStoreData?.GrantedEffect;
 
-    // if the granted effect is empty, we need to find the granted effect from the active skill id
-    // so we need to loop over the grantedEffects and find the effect.ActiveSkill.Id that matches the active skill id
-    if (!grantedEffect) {
-      let activeSkillId = rowStoreData?.Id;
-      let activeSkill = data?.allData.GrantedEffects?.rows.find(
-        (activeSkill) => activeSkill.ActiveSkill?.Id === activeSkillId
-      );
-      console.log("GrantedEffect", activeSkill);
-      grantedEffect = activeSkill?.Id;
-    }
+		// if the granted effect is empty, we need to find the granted effect from the active skill id
+		// so we need to loop over the grantedEffects and find the effect.ActiveSkill.Id that matches the active skill id
+		if (!grantedEffect) {
+			let activeSkillId = rowStoreData?.Id;
+			let activeSkill = data?.allData.GrantedEffects?.rows.find(
+				(activeSkill) => activeSkill.ActiveSkill?.Id === activeSkillId
+			);
+			// console.log('GrantedEffect', activeSkill);
+			grantedEffect = activeSkill?.Id;
+		}
 
-    if (grantedEffect.includes('Player')) {
-      grantedEffect = grantedEffect.replace('Player', '');
-    }
-    
+		if (grantedEffect.includes('Player')) {
+			grantedEffect = grantedEffect.replace('Player', '');
+		}
+
 		// find the granted effect in activeskills
 		let activeSkill = data?.allData.SkillGems?.rows.find(
-			(activeSkill) =>  activeSkill.GemEffects[0].Id === grantedEffect
+			(activeSkill) => activeSkill.GemEffects[0].Id === grantedEffect
 		);
-    
 
 		if (!activeSkill || !activeSkill.GemEffects?.[0]?.GemTags) {
 			console.error('ActiveSkill or GemTags is undefined');
