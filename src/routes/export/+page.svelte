@@ -28,7 +28,7 @@
 
 	let finalProgression = [];
 	let statTextRangeValues = [];
-  let skillProgressionWikiText = '';
+	let skillProgressionWikiText = '';
 
 	// Create an object to store the data so we can generate the wikitext later
 	const skillData = {
@@ -278,14 +278,17 @@
 						result = result.replace('[Projectile|Projectiles]', pluralSuffix);
 					}
 
-          // Handle [Critical|Critical Hit]
-          if (result.includes('[Critical|Critical Hit]')) {
-            // replace with "Critical Hit"
-            result = result.replace('[Critical|Critical Hit]', 'Critical Hit');
-          }
+					// Handle [Critical|Critical Hit]
+					if (result.includes('[Critical|Critical Hit]')) {
+						// replace with "Critical Hit"
+						result = result.replace('[Critical|Critical Hit]', 'Critical Hit');
+					}
 
 					// Handle static replacements
-					result = result.replace('[Chaos|Chaos]', 'Chaos').replace('[Lightning]', 'Lightning').replace('[Total]', 'Total');
+					result = result
+						.replace('[Chaos|Chaos]', 'Chaos')
+						.replace('[Lightning]', 'Lightning')
+						.replace('[Total]', 'Total');
 
 					// Remove leftover directives
 					result = result
@@ -762,24 +765,25 @@ ${skillData.finalProgression.join('\n')}
 ${skillData.quality_stats}
   }}
   {{Skill progression
-  |c1_abbr              = Cold<br>Damage
-    |c1_header          = ${skillData.progression_text[0][0].replace(
-      /(\d+) to (\d+)/,
-      'x to y'
-    ).replace(/[\[\]]/g, '')}
-    |c1_pattern_extract = ${skillData.progression_text[0][0].replace(
-      /(\d+) to (\d+)/,
-      '(%d+) to (%d+)'
-    ).replace(/[\[\]]/g, '')}
+  |c1_abbr              = ${skillData.progression_text[0][0]
+			.replace(/(\d+) to (\d+)/, '')
+      .replace(/Deals/, '')
+			.replace(/[\[\]]/g, '')}
+    |c1_header          = ${skillData.progression_text[0][0]
+			.replace(/(\d+) to (\d+)/, 'x to y')
+			.replace(/[\[\]]/g, '')}
+    |c1_pattern_extract = ${skillData.progression_text[0][0]
+			.replace(/(\d+) to (\d+)/, '(%d+) to (%d+)')
+			.replace(/[\[\]]/g, '')}
     |c1_pattern_value   = %d&nbsp;to&nbsp;%d
   }}
   `;
-  // {{Skill progression
-  // |c1_abbr              = Cold<br>Damage
-  //   |c1_header          = Deals x to y Cold Damage
-  //   |c1_pattern_extract = Deals (%d+) to (%d+) Cold Damage
-  //   |c1_pattern_value   = %d&nbsp;to&nbsp;%d
-  // }}
+		// {{Skill progression
+		// |c1_abbr              = Cold<br>Damage
+		//   |c1_header          = Deals x to y Cold Damage
+		//   |c1_pattern_extract = Deals (%d+) to (%d+) Cold Damage
+		//   |c1_pattern_value   = %d&nbsp;to&nbsp;%d
+		// }}
 	});
 
 	function copyToClipboard(): any {
@@ -795,8 +799,8 @@ ${skillData.quality_stats}
 		// empty set for the statSet
 		let qualSet = new Set<{ id: string; value: number }>();
 		console.log('QualityStats:', qualityStats);
-    let statId = '';
-    let qualStatText = '';
+		let statId = '';
+		let qualStatText = '';
 		for (let i = 0; i < qualityStats.length; i++) {
 			statId = qualityStats[i].Stats[0].Id;
 			const statValueMin = (qualityStats[i].StatsValuesPermille[0] / 1000) * 1;
@@ -816,57 +820,52 @@ ${skillData.quality_stats}
 
 		if (statText) {
 			qualStatText = combineStatDescriptions(statText);
-      // skillData.quality_stats = qualStatText;
+			// skillData.quality_stats = qualStatText;
 		}
 
-    // we need to produce a string like this:
-  //     |quality_type1_stat_text                 = +(0–2)% to Critical Hit Chance
-  // |quality_type1_stat1_id                  = Critical_Hit_Chance
-  // where stat_text is qualStatText and stat1_id is the statId
-  skillData.quality_stats = `
+		// we need to produce a string like this:
+		//     |quality_type1_stat_text                 = +(0–2)% to Critical Hit Chance
+		// |quality_type1_stat1_id                  = Critical_Hit_Chance
+		// where stat_text is qualStatText and stat1_id is the statId
+		skillData.quality_stats = `
   |quality_type1_stat_text                 = ${qualStatText}
   |quality_type1_stat1_id                  = ${statId}
   `;
 	}
 
 	function combineStatDescriptions(descriptions: string[]): string {
-    console.log('Descriptions:', descriptions);
-//     [
-//     " +0.1% to [Critical|Critical Hit] Chance 1",
-//     " +2% to [Critical|Critical Hit] Chance 1"
-// ]
-    // combine the descriptions into a single value, with a range, rounded to the nearest integer (0-2)% to Critical Hit Chance
-    // we need to extract the stat name from the description
-    // we need to extract the value from the description
-    // we need to combine the values into a range
-    // we need to combine the stat names into a single string
+		console.log('Descriptions:', descriptions);
+		// Sample input:
+		// [
+		//     " +0.1% to [Critical|Critical Hit] Chance 1",
+		//     " +2% to [Critical|Critical Hit] Chance 1"
+		// ]
 
-    // extract the stat name from the description
-    const statNames = descriptions.map((description) => {
-      // extract the stat name from the description
-      let statName = description.match(/to (.*)/);
-      // remove the last character from the stat name
-      statName = statName[1].slice(0, -2);
-      return statName;
-    });
+		// Extract the stat name from the description
+		const statNames = descriptions.map((description) => {
+			const match = description.match(/to (.*)/);
+            // remove the number at the end of the string
+      return match ? match[1].replace(/\d+$/, '').trim() : ''; // Extract stat name and trim whitespace
+		});
 
-    // extract the value from the description
-    const statValues = descriptions.map((description) => {
-      // extract the value from the description
-      let statValue = description.match(/(\d+)/);
-      return statValue[0];
-    });
+		// Extract the stat values (handle decimals)
+		const statValues = descriptions.map((description) => {
+			const match = description.match(/([+-]?\d*\.?\d+)%/); // Match decimals or integers
+			return match ? parseFloat(match[1]) : 0; // Parse as a float
+		});
 
-    // combine the values into a range
-    const statValueRange = `${statValues[0]}–${statValues[1]}`;
+		// Combine the values into a range
+		const minValue = Math.min(...statValues); // Get the minimum value
+		const maxValue = Math.max(...statValues); // Get the maximum value
+		const statValueRange = `${minValue}–${maxValue}`;
 
-    // combine the stat names into a single string
-    const statNameString = statNames[0];
+		// Combine the stat names into a single string
+		const statNameString = statNames[0]; // Assuming all descriptions have the same stat name
 
-    // combine the stat name string and the stat value range
-    const combinedStatText = `+(${statValueRange})% to ${statNameString}`;
+		// Combine the stat name and value range
+		const combinedStatText = `+(${statValueRange})% to ${statNameString}`;
 
-    return combinedStatText;
+		return combinedStatText;
 	}
 </script>
 
