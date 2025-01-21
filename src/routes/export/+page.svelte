@@ -28,7 +28,7 @@
 
 	let finalProgression = [];
 	let statTextRangeValues = [];
-	console.log('StatTextRangeValues:', statTextRangeValues);
+  let skillProgressionWikiText = '';
 
 	// Create an object to store the data so we can generate the wikitext later
 	const skillData = {
@@ -58,6 +58,7 @@
 		progression_text: [],
 		//
 		gem_tier: 0,
+		quality_stats: '',
 
 		// gem progression goes here
 		finalProgression: finalProgression
@@ -232,6 +233,20 @@
 							renderedText = renderedValue.toString();
 						}
 
+						// divide_by_one_hundred
+						if (desc.includes('divide_by_one_hundred')) {
+							renderedValue = parseFloat((value / 100).toFixed(2)); // Transform value
+							renderedText = `${renderedValue > 0 ? '+' : ''}${renderedValue}`; // Format with sign and percentage
+							result = result.replace(new RegExp(`\\{${idx}\\:\\+d\\}`, 'g'), renderedText); // Replace `{idx:+d}`
+							result = result.replace(new RegExp(`\\{${idx}\\}`, 'g'), renderedText); // Replace `{idx}`
+							result = result.replace('divide_by_one_hundred', ''); // Remove directive
+						} else if (desc.includes(`{${idx}:+d}`)) {
+							renderedText = value >= 0 ? `+${value}` : `${value}`;
+							result = result.replace(new RegExp(`\\{${idx}\\:\\+d\\}`, 'g'), renderedText);
+						} else {
+							result = result.replace(new RegExp(`\\{${idx}\\}`, 'g'), renderedText);
+						}
+
 						if (desc.includes(`{${idx}:+d}`)) {
 							renderedText = value >= 0 ? `+${value}` : `${value}`;
 							result = result.replace(new RegExp(`\\{${idx}\\:\\+d\\}`, 'g'), renderedText);
@@ -263,8 +278,14 @@
 						result = result.replace('[Projectile|Projectiles]', pluralSuffix);
 					}
 
+          // Handle [Critical|Critical Hit]
+          if (result.includes('[Critical|Critical Hit]')) {
+            // replace with "Critical Hit"
+            result = result.replace('[Critical|Critical Hit]', 'Critical Hit');
+          }
+
 					// Handle static replacements
-					result = result.replace('[Chaos|Chaos]', 'Chaos').replace('[Lightning]', 'Lightning');
+					result = result.replace('[Chaos|Chaos]', 'Chaos').replace('[Lightning]', 'Lightning').replace('[Total]', 'Total');
 
 					// Remove leftover directives
 					result = result
@@ -345,7 +366,9 @@
 		parseBaseItemTypes(skillId, skillName);
 
 		const grantedEffect = await findGrantedEffectId(skillId);
-		// console.log('Effect', grantedEffect);
+		console.log('Effect', grantedEffect);
+
+		await getGemQuality(grantedEffect?.Id);
 
 		try {
 			const castTime = grantedEffect?.CastTime;
@@ -380,7 +403,6 @@
 
 	function findGrantedEffectStatSetPerLevel(skillId: string) {
 		// console.log('GrantedEffectsStatSetsPerLevel', grantedEffectsStatSetsPerLevel);
-
 		return grantedEffectsStatSetsPerLevel.find((effect) => {
 			try {
 				return effect.StatSet.Id === skillId;
@@ -538,8 +560,9 @@
 				});
 			}
 
-      // remove the square brackets from the text
-      text = text.replace(/[\[\]]/g, '');
+			// remove the square brackets from the text
+			// TODO: find a better way to do this
+			text = text.replace(/[\[\]]/g, '');
 
 			finalProgression.push(text);
 		});
@@ -557,7 +580,7 @@
 		});
 
 		const grantedEffectStatSetPerLevel = findGrantedEffectStatSetPerLevel(grantedEffect?.Id);
-		// console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
+		console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
 		const critChance =
 			grantedEffectStatSetPerLevel?.AttackCritChance ||
 			grantedEffectStatSetPerLevel?.SpellCritChance;
@@ -577,7 +600,7 @@
 			}
 		}
 
-		// console.log('📊 Collected Additional StatSet:', Array.from(statSet));
+		console.log('📊 Collected Additional StatSet:', Array.from(statSet));
 
 		const floatStats = grantedEffectStatSetPerLevel?.FloatStats || [];
 		const floatStatsValues =
@@ -597,7 +620,9 @@
 
 		// console.log('📊 Collected Float StatSet:', Array.from(statSet));
 
-		const statText = await getStatDescriptionsForAll(Array.from(statSet));
+		// const statText = await getStatDescriptionsForAll(Array.from(statSet));
+		// flip the array
+		const statText = await getStatDescriptionsForAll(Array.from(statSet).reverse());
 		skillData.stat_text = statText?.join('<br>') || '';
 	}
 
@@ -699,11 +724,9 @@
 		console.log('SkillData:', skillData);
 
 		// in the statTextRangeValues.stat_text, match the skillData.stat_text and replace the numbers with the values from the statTextRangeValues array
-		console.log('Skill Data: ', skillData.stat_text);
-		console.log('Stat Text Range Values: ', statTextRangeValues);
 		// if skilldata.stat_text includes the statTextRangeValues.stat_text, replace the numbers with the values from the statTextRangeValues.stat1_values and stat2_values
 		const finalStatText = replaceDamageText(statTextRangeValues, skillData.stat_text);
-		console.log('Final Stat Text: ', finalStatText);
+		// console.log('Final Stat Text: ', finalStatText);
 
 		skillData.stat_text = finalStatText;
 
@@ -733,14 +756,117 @@
 |stat_text                               = ${skillData.stat_text}
 |gem_tier                                = ${skillData.gem_tier}
 
+
 ${skillData.finalProgression.join('\n')}
+
+${skillData.quality_stats}
   }}
-`;
+  {{Skill progression
+  |c1_abbr              = Cold<br>Damage
+    |c1_header          = ${skillData.progression_text[0][0].replace(
+      /(\d+) to (\d+)/,
+      'x to y'
+    ).replace(/[\[\]]/g, '')}
+    |c1_pattern_extract = ${skillData.progression_text[0][0].replace(
+      /(\d+) to (\d+)/,
+      '(%d+) to (%d+)'
+    ).replace(/[\[\]]/g, '')}
+    |c1_pattern_value   = %d&nbsp;to&nbsp;%d
+  }}
+  `;
+  // {{Skill progression
+  // |c1_abbr              = Cold<br>Damage
+  //   |c1_header          = Deals x to y Cold Damage
+  //   |c1_pattern_extract = Deals (%d+) to (%d+) Cold Damage
+  //   |c1_pattern_value   = %d&nbsp;to&nbsp;%d
+  // }}
 	});
 
 	function copyToClipboard(): any {
 		// copy wiki text to clipboard
 		navigator.clipboard.writeText(wikitext);
+	}
+
+	async function getGemQuality(grantedEffectId: string) {
+		const qualityStats = data.allData.GrantedEffectQualityStats?.rows.filter(
+			(qualityStat) => qualityStat.GrantedEffect.Id === grantedEffectId
+		);
+
+		// empty set for the statSet
+		let qualSet = new Set<{ id: string; value: number }>();
+		console.log('QualityStats:', qualityStats);
+    let statId = '';
+    let qualStatText = '';
+		for (let i = 0; i < qualityStats.length; i++) {
+			statId = qualityStats[i].Stats[0].Id;
+			const statValueMin = (qualityStats[i].StatsValuesPermille[0] / 1000) * 1;
+			const statValueMax = (qualityStats[i].StatsValuesPermille[0] / 1000) * 20;
+			if (statId) {
+				qualSet.add({ id: statId, value: statValueMin });
+				qualSet.add({ id: statId, value: statValueMax });
+			} else {
+				console.warn('⚠️ Invalid statId at index:', i, qualityStats[i]);
+			}
+		}
+
+		// console.log('📊 Collected Quality StatSet:', Array.from(qualSet));
+
+		const statText = await getStatDescriptionsForAll(Array.from(qualSet));
+		console.log('Quality Stat Text:', statText);
+
+		if (statText) {
+			qualStatText = combineStatDescriptions(statText);
+      // skillData.quality_stats = qualStatText;
+		}
+
+    // we need to produce a string like this:
+  //     |quality_type1_stat_text                 = +(0–2)% to Critical Hit Chance
+  // |quality_type1_stat1_id                  = Critical_Hit_Chance
+  // where stat_text is qualStatText and stat1_id is the statId
+  skillData.quality_stats = `
+  |quality_type1_stat_text                 = ${qualStatText}
+  |quality_type1_stat1_id                  = ${statId}
+  `;
+	}
+
+	function combineStatDescriptions(descriptions: string[]): string {
+    console.log('Descriptions:', descriptions);
+//     [
+//     " +0.1% to [Critical|Critical Hit] Chance 1",
+//     " +2% to [Critical|Critical Hit] Chance 1"
+// ]
+    // combine the descriptions into a single value, with a range, rounded to the nearest integer (0-2)% to Critical Hit Chance
+    // we need to extract the stat name from the description
+    // we need to extract the value from the description
+    // we need to combine the values into a range
+    // we need to combine the stat names into a single string
+
+    // extract the stat name from the description
+    const statNames = descriptions.map((description) => {
+      // extract the stat name from the description
+      let statName = description.match(/to (.*)/);
+      // remove the last character from the stat name
+      statName = statName[1].slice(0, -2);
+      return statName;
+    });
+
+    // extract the value from the description
+    const statValues = descriptions.map((description) => {
+      // extract the value from the description
+      let statValue = description.match(/(\d+)/);
+      return statValue[0];
+    });
+
+    // combine the values into a range
+    const statValueRange = `${statValues[0]}–${statValues[1]}`;
+
+    // combine the stat names into a single string
+    const statNameString = statNames[0];
+
+    // combine the stat name string and the stat value range
+    const combinedStatText = `+(${statValueRange})% to ${statNameString}`;
+
+    return combinedStatText;
 	}
 </script>
 
