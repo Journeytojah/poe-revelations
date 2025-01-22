@@ -2,7 +2,8 @@ import type { SchemaFile, SchemaTable } from 'pathofexile-dat-schema';
 
 export async function fetchSchema(fetch: (input: RequestInfo | URL) => Promise<Response>): Promise<SchemaFile | null> {
   try {
-    return await fetch('/schema.min.json').then((r) => r.json());
+    // return await fetch('/schema.min.json').then((r) => r.json());
+    return await fetch("https://github.com/poe-tool-dev/dat-schema/releases/download/latest/schema.min.json").then((r) => r.json());
   } catch (error) {
     console.error('Failed to fetch schema:', error);
     return null;
