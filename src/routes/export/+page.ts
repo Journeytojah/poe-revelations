@@ -71,7 +71,7 @@ export const load: PageLoad = async ({ fetch, url }) => {
 
         // ✅ Fetch Referenced Tables
         for (const fk of foreignKeys) {
-          const referencedTableName = fk.type.key?.table;
+          const referencedTableName = (fk.type.key as { table?: string; foreign?: boolean })?.table;
 
           if (referencedTableName && !referencedTables[referencedTableName]) {
             try {
@@ -100,7 +100,7 @@ export const load: PageLoad = async ({ fetch, url }) => {
         // ✅ Process Foreign Key Relationships
         for (const foreignKey of foreignKeys) {
           const columnName = foreignKey.name;
-          const referencedTableName = foreignKey.type.key?.table;
+          const referencedTableName = (foreignKey.type.key as { table?: string; foreign?: boolean })?.table;
 
           const referencedTable = referencedTables[referencedTableName!];
           if (!referencedTable) {

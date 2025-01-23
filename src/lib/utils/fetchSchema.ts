@@ -2,13 +2,18 @@ import type { SchemaFile, SchemaTable } from 'pathofexile-dat-schema';
 
 export async function fetchSchema(fetch: (input: RequestInfo | URL) => Promise<Response>): Promise<SchemaFile | null> {
   try {
-    // return await fetch('/schema.min.json').then((r) => r.json());
-    return await fetch("https://github.com/poe-tool-dev/dat-schema/releases/download/latest/schema.min.json").then((r) => r.json());
+    const url = 'https://github.com/poe-tool-dev/dat-schema/releases/download/latest/schema.min.json';
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch schema: ${response.status}`);
+    }
+    return await response.json();
   } catch (error) {
-    console.error('Failed to fetch schema:', error);
+    console.error('Error fetching schema:', error);
     return null;
   }
 }
+
 
 export function findTable(schema: SchemaFile, tableName: string, version: string): SchemaTable | null {
   if (!version || isNaN(parseInt(version, 10))) {
