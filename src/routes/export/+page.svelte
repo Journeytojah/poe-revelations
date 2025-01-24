@@ -27,7 +27,13 @@
 	// do a loop and create the empty objects for each level from 1 to 40
 
 	let finalProgression: string[] = [];
-	let statTextRangeValues: { stat1_id?: any; stat1_value?: any; stat2_id?: any; stat2_value?: any; stat_text?: string | undefined; }[] = [];
+	let statTextRangeValues: {
+		stat1_id?: any;
+		stat1_value?: any;
+		stat2_id?: any;
+		stat2_value?: any;
+		stat_text?: string | undefined;
+	}[] = [];
 	let skillProgressionWikiText = '';
 
 	// Create an object to store the data so we can generate the wikitext later
@@ -271,17 +277,26 @@
 						}
 					});
 
-          if (result.includes('#|-1 "0% reduced [Projectile] Speed" negate 1')) {
-            result = result.replace('#|-1 "0% reduced [Projectile] Speed" negate 1', '0% reduced Projectile Speed');
-          } else if (result.includes('1|# "0% increased [Projectile] Speed"')) {
-            result = result.replace('1|# "0% increased [Projectile] Speed"', '0% increased Projectile Speed');
-          }
+					if (result.includes('#|-1 "0% reduced [Projectile] Speed" negate 1')) {
+						result = result.replace(
+							'#|-1 "0% reduced [Projectile] Speed" negate 1',
+							'0% reduced Projectile Speed'
+						);
+					} else if (result.includes('1|# "0% increased [Projectile] Speed"')) {
+						result = result.replace(
+							'1|# "0% increased [Projectile] Speed"',
+							'0% increased Projectile Speed'
+						);
+					}
 
-          if (result.includes('2|# 0 # "Fires 6 [Projectile|Projectiles]"')){
-            result = result.replace('2|# 0 # "Fires 6 [Projectile|Projectiles]"', 'Fires 6 Projectiles');            
-          } else if (result.includes('2|# 1 # "Fires 6 Arrows"')){
-            result = result.replace('2|# 1 # "Fires 6 Arrows"', 'Fires 6 Arrows');
-          }
+					if (result.includes('2|# 0 # "Fires 6 [Projectile|Projectiles]"')) {
+						result = result.replace(
+							'2|# 0 # "Fires 6 [Projectile|Projectiles]"',
+							'Fires 6 Projectiles'
+						);
+					} else if (result.includes('2|# 1 # "Fires 6 Arrows"')) {
+						result = result.replace('2|# 1 # "Fires 6 Arrows"', 'Fires 6 Arrows');
+					}
 
 					// Handle singular/plural placeholders
 					if (result.includes('[Projectile|Projectiles]')) {
@@ -301,9 +316,8 @@
 						.replace('[Lightning]', 'Lightning')
 						.replace('[Total]', 'Total')
 						.replace('[Projectile]', 'Projectile')
-            .replace('[Physical]', 'Physical')
-            .replace('[Fire]', 'Fire')
-          
+						.replace('[Physical]', 'Physical')
+						.replace('[Fire]', 'Fire');
 
 					// Remove leftover directives
 					result = result
@@ -325,26 +339,26 @@
 					// discard the second rendered description because we are using singular
 					renderedDescriptions = renderedDescriptions.slice(0, 1);
 				}
-        // if the rendered description is like
-        // [
-        //     "1000 Projectile duration is 2 second 1",
-        //     " Projectile duration is 2 seconds 1"
-        // ]
-        if (renderedDescriptions.length === 2) {
-          const firstDescription = renderedDescriptions[0];
-          const secondDescription = renderedDescriptions[1];
-          const firstMatch = firstDescription.match(/is (\d+) second/);
-          const secondMatch = secondDescription.match(/is (\d+) seconds/);
-          if (firstMatch && secondMatch) {
-            const firstValue = parseInt(firstMatch[1]);
-            const secondValue = parseInt(secondMatch[1]);
-            if (firstValue === 1 && secondValue !== 1) {
-              renderedDescriptions = renderedDescriptions.slice(0, 1);
-            } else {
-              renderedDescriptions = renderedDescriptions.slice(1, 2);
-            }
-          }
-        }
+				// if the rendered description is like
+				// [
+				//     "1000 Projectile duration is 2 second 1",
+				//     " Projectile duration is 2 seconds 1"
+				// ]
+				if (renderedDescriptions.length === 2) {
+					const firstDescription = renderedDescriptions[0];
+					const secondDescription = renderedDescriptions[1];
+					const firstMatch = firstDescription.match(/is (\d+) second/);
+					const secondMatch = secondDescription.match(/is (\d+) seconds/);
+					if (firstMatch && secondMatch) {
+						const firstValue = parseInt(firstMatch[1]);
+						const secondValue = parseInt(secondMatch[1]);
+						if (firstValue === 1 && secondValue !== 1) {
+							renderedDescriptions = renderedDescriptions.slice(0, 1);
+						} else {
+							renderedDescriptions = renderedDescriptions.slice(1, 2);
+						}
+					}
+				}
 
 				// Add rendered descriptions to the collection
 				allRenderedDescriptions.push(...renderedDescriptions);
@@ -476,9 +490,15 @@
 		// console.log('Progression2:', progression2);
 
 		let floatStats = progression.map((effect) => effect.FloatStats);
+		let additionalStats = progression.map((effect) => effect.AdditionalStats);
 		// return the Ids
-		floatStats = floatStats.map((stats) => stats.map((stat: { Id: any; }) => stat.Id));
+		floatStats = floatStats.map((stats) => stats.map((stat: { Id: any }) => stat.Id));
+		additionalStats = additionalStats.map((stats) => stats.map((stat: { Id: any }) => stat.Id));
+		// console.log('AdditionalStats:', additionalStats);
+
 		const baseResolvedValues = progression.map((effect) => effect.BaseResolvedValues);
+		const additionalStatsValues = progression.map((effect) => effect.AdditionalStatsValues);
+		// console.log('AdditionalStatsValues:', additionalStatsValues);
 
 		// now we need to combine the two arrays (floatStats and baseResolvedValues) into one array of objects
 		floatStats = floatStats.map((stats, index) => {
@@ -490,15 +510,31 @@
 			});
 		});
 
+		additionalStats = additionalStats.map((stats, index) => {
+			return stats.map((stat: any, i: string | number) => {
+				return {
+					id: stat,
+					value: additionalStatsValues[index][i]
+				};
+			});
+		});
+
 		// console.log('FloatStats:', floatStats);
 		const statSetProgression = new Set(floatStats.flat());
+		const additionalStatSetProgression = new Set(additionalStats.flat());
 		// console.log('StatSet:', statSet);
 		// for each stat in the statSet, we need to get the stat description
 
 		const statDescriptions = await getStatDescriptionsForAll(Array.from(statSetProgression), false);
+		const additionalStatDescriptions = await getStatDescriptionsForAll(
+			Array.from(additionalStatSetProgression),
+			false
+		);
 		// skillData.progression_text = statDescriptions?.join('<br>') || '';
 		if (statDescriptions) {
 			skillData.progression_text.push(statDescriptions);
+		} else if (additionalStatDescriptions) {
+			skillData.progression_text.push(additionalStatDescriptions);
 		}
 
 		// console.log('StatDescriptions:', statDescriptions);
@@ -517,12 +553,13 @@
 		const actorLevels = progression.map((effect) => Math.floor(effect.ActorLevel));
 
 		// console.log('Levels:', levels);
-
 		return {
 			stat: statProgression,
+			additionalStats: additionalStats,
 			levels: actorLevels,
 			cost: costAmounts,
 			statDescriptions: statDescriptions,
+			additionalStatDescriptions: additionalStatDescriptions,
 			floatStats: floatStats
 		};
 	}
@@ -547,13 +584,13 @@
 		skillData.skill_id = rowStoreData?.Id.charAt(0).toUpperCase() + rowStoreData?.Id.slice(1);
 		// skillData.gem_description = rowStoreData?.Description;
 
-    // first we need to remove any square brackets from the description
-    // and process stats like [Projectile|Projectiles] accordingly
-    let gemDescription = rowStoreData?.Description;
-    gemDescription = gemDescription.replace(/[\[\]]/g, '');
-    gemDescription = gemDescription.replace('[Projectile|Projectiles]', 'Projectiles');
-    gemDescription = gemDescription.replace('Projectile|Projectiles', 'Projectiles');
-    skillData.gem_description = gemDescription;
+		// first we need to remove any square brackets from the description
+		// and process stats like [Projectile|Projectiles] accordingly
+		let gemDescription = rowStoreData?.Description;
+		gemDescription = gemDescription.replace(/[\[\]]/g, '');
+		gemDescription = gemDescription.replace('[Projectile|Projectiles]', 'Projectiles');
+		gemDescription = gemDescription.replace('Projectile|Projectiles', 'Projectiles');
+		skillData.gem_description = gemDescription;
 
 		const weaponRestrictions = rowStoreData?.WeaponRestriction_ItemClasses || [];
 		const weaponRestrictionNames = weaponRestrictions.map(
@@ -568,8 +605,8 @@
 		console.log('EffectPerLevel', grantedEffectsPerLevel);
 		const gemProgression = await findGemProgression(grantedEffectsPerLevel?.GrantedEffect.Id);
 
-    // initialize text string
-    let progressionText = '';
+		// initialize text string
+		let progressionText = '';
 
 		gemProgression.stat.forEach((stat, index) => {
 			// console.log('Stat Progression:', stat);
@@ -583,6 +620,7 @@
 			// console.log('Level:', level);
 
 			const floatStatLength = gemProgression.floatStats[index].length;
+			const additionalStatLength = gemProgression.additionalStats[index].length;
 
 			progressionText = `
 |level${index + 1} = ${index < 20 ? 'True' : 'False'}
@@ -592,12 +630,28 @@
 				skillData.intelligence_percent || skillData.strength_percent || skillData.dexterity_percent
 			)}
 |level${index + 1}_cost_amounts = ${gemProgression.cost[index]}
-|level${index + 1}_stat_text = ${gemProgression.statDescriptions?.[index]}
+|level${index + 1}_stat_text = ${gemProgression.statDescriptions?.[index]} <br> ${gemProgression.additionalStatDescriptions?.[index]}
 |level${index + 1}_stat1_id = ${gemProgression.floatStats[index][0].id}
 |level${index + 1}_stat1_value = ${gemProgression.floatStats[index][0].value}
 |level${index + 1}_stat2_id = ${gemProgression.floatStats[index][1].id}
 |level${index + 1}_stat2_value = ${gemProgression.floatStats[index][1].value}
-    `;
+`;
+
+			// Dynamically add additional stats
+			if (gemProgression.additionalStats?.[index]) {
+				gemProgression.additionalStats[index].forEach((stat, statIndex) => {
+					progressionText += `
+|level${index + 1}_stat${statIndex + 3}_id = ${stat.id}
+|level${index + 1}_stat${statIndex + 3}_value = ${stat.value}
+        `;
+				});
+			}
+
+			// |level${index + 1}_stat3_id = ${gemProgression.additionalStats[index][0].id}
+			// |level${index + 1}_stat3_value = ${gemProgression.additionalStats[index][0].value}
+			// |level${index + 1}_stat4_id = ${gemProgression.additionalStats[index][1].id}
+			// |level${index + 1}_stat4_value = ${gemProgression.additionalStats[index][1].value}
+			// loop and generate progresion text for n stats based on the length of the addtional stats
 
 			// push the text for the first and last levels to the statTextRangeValues array
 			if (index === 0 || index === 19) {
@@ -707,8 +761,7 @@
 
 		let gemTags = activeSkill.GemEffects[0].GemTags;
 
-    console.log('GemTags:', gemTags);
-    
+		console.log('GemTags:', gemTags);
 
 		// Map over gemTags safely
 		let tags = gemTags.map((tag: number) => {
@@ -740,27 +793,26 @@
 			return replaceStatText;
 		}
 
-    const damageTypes = [
-      'spell_minimum_base_cold_damage',
-      'spell_maximum_base_cold_damage',
-      'spell_minimum_base_lightning_damage',
-      'spell_maximum_base_lightning_damage',
-      'spell_minimum_base_fire_damage',
-      'spell_maximum_base_fire_damage',
-      'spell_minimum_base_physical_damage',
-      'spell_maximum_base_physical_damage',
-      'spell_minimum_base_chaos_damage',
-      'spell_maximum_base_chaos_damage'
-    ];
+		const damageTypes = [
+			'spell_minimum_base_cold_damage',
+			'spell_maximum_base_cold_damage',
+			'spell_minimum_base_lightning_damage',
+			'spell_maximum_base_lightning_damage',
+			'spell_minimum_base_fire_damage',
+			'spell_maximum_base_fire_damage',
+			'spell_minimum_base_physical_damage',
+			'spell_maximum_base_physical_damage',
+			'spell_minimum_base_chaos_damage',
+			'spell_maximum_base_chaos_damage'
+		];
 
-    const damageRanges = data.filter(
-      (item: { stat1_id: string; stat2_id: string; }) =>
-        damageTypes.includes(item.stat1_id) &&
-        damageTypes.includes(item.stat2_id)
-    );
+		const damageRanges = data.filter(
+			(item: { stat1_id: string; stat2_id: string }) =>
+				damageTypes.includes(item.stat1_id) && damageTypes.includes(item.stat2_id)
+		);
 
-    // Ensure we have exactly two damage ranges
-    if (damageRanges.length !== 2) {
+		// Ensure we have exactly two damage ranges
+		if (damageRanges.length !== 2) {
 			console.error('⚠️ Invalid damage range data. Expected exactly two entries.');
 			return replaceStatText;
 		}
@@ -830,9 +882,9 @@ ${skillData.quality_stats}
   }}
   {{Skill progression
   |c1_abbr              = ${skillData.progression_text[0][0]
-			.replace(/(\d+) to (\d+)/, '')
-      .replace(/Deals/, '')
-			.replace(/[\[\]]/g, '')}
+		.replace(/(\d+) to (\d+)/, '')
+		.replace(/Deals/, '')
+		.replace(/[\[\]]/g, '')}
     |c1_header          = ${skillData.progression_text[0][0]
 			.replace(/(\d+) to (\d+)/, 'x to y')
 			.replace(/[\[\]]/g, '')}
@@ -908,8 +960,8 @@ ${skillData.quality_stats}
 		// Extract the stat name from the description
 		const statNames = descriptions.map((description) => {
 			const match = description.match(/to (.*)/);
-            // remove the number at the end of the string
-      return match ? match[1].replace(/\d+$/, '').trim() : ''; // Extract stat name and trim whitespace
+			// remove the number at the end of the string
+			return match ? match[1].replace(/\d+$/, '').trim() : ''; // Extract stat name and trim whitespace
 		});
 
 		// Extract the stat values (handle decimals)
