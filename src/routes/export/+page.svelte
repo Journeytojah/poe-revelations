@@ -62,6 +62,7 @@
 		static_critical_strike_chance: 0.0,
 		stat_text: '',
 		progression_text: [] as string[][],
+		additional_progression_text: [] as string[][],
 		//
 		gem_tier: 0,
 		quality_stats: '',
@@ -537,34 +538,31 @@
 			const levelDescIndex = levelIndex * 2; // Each level has 2 descriptions (projectile count + speed)
 
 			// Get projectile count description (even indices)
-      if (levelStats[0]?.id === 'projectile_count') {
-        const projectileDesc =
-          additionalStatDescriptions[levelDescIndex] || `Fires ${levelStats[0]?.value} Projectiles`;
+			if (levelStats[0]?.id === 'projectile_count') {
+				const projectileDesc =
+					additionalStatDescriptions[levelDescIndex] || `Fires ${levelStats[0]?.value} Projectiles`;
 
-        // Get speed description (odd indices)
-        const speedValue = levelStats[1]?.value || 0;
-        const speedDesc =
-          additionalStatDescriptions[levelDescIndex + 1] || `${speedValue}% increased Projectile Speed`;
-
-        additionalStatDescriptions.push([projectileDesc, speedDesc].join('<br>'));
-      }
-			const projectileDesc =
-				additionalStatDescriptions[levelDescIndex] || `Fires ${levelStats[0]?.value} Projectiles`;
-
+          additionalStatDescriptions.push(projectileDesc);
+			}
 			// Get speed description (odd indices)
 			const speedValue = levelStats[1]?.value || 0;
 			const speedDesc =
-				additionalStatDescriptions[levelDescIndex + 1] || `${speedValue}% increased Projectile Speed`;
+				additionalStatDescriptions[levelDescIndex + 1] ||
+				`${speedValue}% increased Projectile Speed`;
 
-			additionalStatDescriptions.push([projectileDesc, speedDesc].join('<br>'));
+      additionalStatDescriptions.push(speedDesc);
+
+      console.log('ProjectileCount:', levelStats[0]);
+      console.log('ProjectileSpeed:', levelStats[1]);
+
+      skillData.additional_progression_text.push(additionalStatDescriptions);
 		}
 
 		// skillData.progression_text = statDescriptions?.join('<br>') || '';
 		if (statDescriptions) {
 			skillData.progression_text.push(statDescriptions);
-		} else if (additionalStatDescriptions) {
-			skillData.progression_text.push(additionalStatDescriptions);
 		}
+
 
 		// console.log('StatDescriptions:', statDescriptions);
 
@@ -920,6 +918,39 @@ ${skillData.quality_stats}
 			.replace(/(\d+) to (\d+)/, '(%d+) to (%d+)')
 			.replace(/[\[\]]/g, '')}
     |c1_pattern_value   = %d&nbsp;to&nbsp;%d
+    |c2_abbr              = ${skillData.additional_progression_text[0][0]
+			.replace(/(\d+) to (\d+)/, '')
+			.replace(/Deals/, '')
+      // if it includes Fires x Projectiles, we shoudl show "Projectile Count" instead of "Fires x Projectiles"
+      .replace(/Fires (\d+) Projectiles/, 'Projectile Count')
+			.replace(/[\[\]]/g, '')}
+    |c2_header          = ${skillData.additional_progression_text[0][0]
+			.replace(/(\d+) to (\d+)/, 'x to y')
+      .replace(/Fires (\d+) Projectiles/, 'Fires x Projectiles')
+			.replace(/[\[\]]/g, '')}
+    |c2_pattern_extract = ${skillData.additional_progression_text[0][0]
+			.replace(/(\d+) to (\d+)/, '(%d+) to (%d+)')
+      // Fires (%d+) Projectiles
+      .replace(/Fires (\d+) Projectiles/, 'Fires (%d+) Projectiles')
+			.replace(/[\[\]]/g, '')}
+    |c2_pattern_value   = %d
+    |c3_abbr              = ${skillData.additional_progression_text[0][1]
+      .replace(/(\d+) to (\d+)/, '')
+      // 0% increased Projectile Speed
+      .replace(/0% increased Projectile Speed/, 'Projectile Speed')
+      .replace(/[\[\]]/g, '')}
+    |c3_header          = ${skillData.additional_progression_text[0][1]
+      .replace(/(\d+) to (\d+)/, 'x to y')
+      // x% Increased Projectile Speed
+      .replace(/(\d+)% increased Projectile Speed/, 'x% Increased Projectile Speed')
+      .replace(/[\[\]]/g, '')}
+    |c3_pattern_extract = ${skillData.additional_progression_text[0][1]
+      .replace(/(\d+) to (\d+)/, '(%d+) to (%d+)')
+      // (%d+)%% Increased Projectile Speed
+      .replace(/(\d+)% increased Projectile Speed/, '(%d+)%% Increased Projectile Speed')
+      .replace(/[\[\]]/g, '')}
+    |c3_pattern_value   =  %d%%
+
   }}
   `;
 		// {{Skill progression
