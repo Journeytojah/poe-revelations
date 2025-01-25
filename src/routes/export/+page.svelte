@@ -526,10 +526,39 @@
 		// for each stat in the statSet, we need to get the stat description
 
 		const statDescriptions = await getStatDescriptionsForAll(Array.from(statSetProgression), false);
-		const additionalStatDescriptions = await getStatDescriptionsForAll(
+		let additionalStatDescriptions = await getStatDescriptionsForAll(
 			Array.from(additionalStatSetProgression),
 			false
 		);
+
+		additionalStatDescriptions = [];
+		for (let levelIndex = 0; levelIndex < additionalStats.length; levelIndex++) {
+			const levelStats = additionalStats[levelIndex];
+			const levelDescIndex = levelIndex * 2; // Each level has 2 descriptions (projectile count + speed)
+
+			// Get projectile count description (even indices)
+      if (levelStats[0]?.id === 'projectile_count') {
+        const projectileDesc =
+          additionalStatDescriptions[levelDescIndex] || `Fires ${levelStats[0]?.value} Projectiles`;
+
+        // Get speed description (odd indices)
+        const speedValue = levelStats[1]?.value || 0;
+        const speedDesc =
+          additionalStatDescriptions[levelDescIndex + 1] || `${speedValue}% increased Projectile Speed`;
+
+        additionalStatDescriptions.push([projectileDesc, speedDesc].join('<br>'));
+      }
+			const projectileDesc =
+				additionalStatDescriptions[levelDescIndex] || `Fires ${levelStats[0]?.value} Projectiles`;
+
+			// Get speed description (odd indices)
+			const speedValue = levelStats[1]?.value || 0;
+			const speedDesc =
+				additionalStatDescriptions[levelDescIndex + 1] || `${speedValue}% increased Projectile Speed`;
+
+			additionalStatDescriptions.push([projectileDesc, speedDesc].join('<br>'));
+		}
+
 		// skillData.progression_text = statDescriptions?.join('<br>') || '';
 		if (statDescriptions) {
 			skillData.progression_text.push(statDescriptions);
@@ -538,6 +567,9 @@
 		}
 
 		// console.log('StatDescriptions:', statDescriptions);
+
+		console.log('AdditionalStats:', additionalStats);
+		console.log('AdditionalStatDescriptions:', additionalStatDescriptions);
 
 		// TODO: handle life and mana cost amounts
 		const costAmounts = progression2.map((effect) => effect.CostAmounts[0]);
@@ -639,19 +671,15 @@
 
 			// Dynamically add additional stats
 			if (gemProgression.additionalStats?.[index]) {
-				gemProgression.additionalStats[index].forEach((stat, statIndex) => {
-					progressionText += `
+				gemProgression.additionalStats[index].forEach(
+					(stat: { id: any; value: any }, statIndex: number) => {
+						progressionText += `
 |level${index + 1}_stat${statIndex + 3}_id = ${stat.id}
 |level${index + 1}_stat${statIndex + 3}_value = ${stat.value}
         `;
-				});
+					}
+				);
 			}
-
-			// |level${index + 1}_stat3_id = ${gemProgression.additionalStats[index][0].id}
-			// |level${index + 1}_stat3_value = ${gemProgression.additionalStats[index][0].value}
-			// |level${index + 1}_stat4_id = ${gemProgression.additionalStats[index][1].id}
-			// |level${index + 1}_stat4_value = ${gemProgression.additionalStats[index][1].value}
-			// loop and generate progresion text for n stats based on the length of the addtional stats
 
 			// push the text for the first and last levels to the statTextRangeValues array
 			if (index === 0 || index === 19) {
