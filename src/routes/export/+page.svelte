@@ -1,11 +1,9 @@
 <script lang="ts">
-	type StatBlock = {
-		stats: string[];
-		values: string[];
-		descriptions: string[];
-	};
+
 
 	import { rowStore } from '$lib/stores/rowStore';
+	import { getConstantStats } from '$lib/utils/exporters/activeSkills/getConstantStats.js';
+	import { getStatDescriptionsForAll } from '$lib/utils/exporters/activeSkills/getStatDescriptions.js';
 	import { fetchStatDescriptions } from '$lib/utils/fetchStatDescriptions.js';
 	import { fetchVersion } from '$lib/utils/fetchVersion.js';
 	import { onMount } from 'svelte';
@@ -87,292 +85,9 @@
 		});
 	}
 
-	function parseStatDescriptions(data: string): StatBlock[] {
-		const lines = data
-			.split('\n')
-			.map((line) => line.trim())
-			.filter((line) => line);
-		const blocks: StatBlock[] = [];
-		let currentBlock: StatBlock | null = null;
 
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
 
-			if (line.startsWith('description')) {
-				if (currentBlock) blocks.push(currentBlock); // Save the previous block
-				currentBlock = { stats: [], values: [], descriptions: [] };
-				continue;
-			}
 
-			if (currentBlock && currentBlock.stats.length === 0) {
-				currentBlock.stats.push(line);
-				continue;
-			}
-
-			if (
-				currentBlock &&
-				currentBlock.stats.length > 0 &&
-				currentBlock.values.length === 0 &&
-				/^\d+$/.test(line)
-			) {
-				currentBlock.values.push(line);
-				continue;
-			}
-
-			if (currentBlock) {
-				currentBlock.descriptions.push(line);
-			}
-		}
-
-		if (currentBlock) blocks.push(currentBlock);
-
-		return blocks;
-	}
-
-	async function getStatDescriptionsForAll(
-		statSet: { id: string; value: number }[],
-		skipSame: boolean = true
-	) {
-		// console.log('1. StatSet:', statSet);
-		if (!statSet || statSet.length === 0) {
-			console.warn('⚠️ No stats to fetch.');
-			return;
-		}
-
-		const { patchUrl } = await fetchVersion(fetch, gameVersion);
-		const statDescriptions = await fetchStatDescriptions(
-			fetch,
-			patchUrl,
-			rowStoreData?.StatDescription
-		);
-
-		// Parse descriptions into structured blocks
-		const parsedBlocks = parseStatDescriptions(statDescriptions);
-
-		// Group stats by id
-		const groupedStats = statSet.reduce(
-			(acc, { id, value }) => {
-				if (!acc[id]) {
-					acc[id] = [];
-				}
-				acc[id].push(value);
-				return acc;
-			},
-			{} as Record<string, number[]>
-		);
-
-		// Process stats
-		const processedStats = new Set<string>();
-		const allRenderedDescriptions: string[] = []; // Collect all descriptions
-
-		Object.entries(groupedStats).forEach(([id, values]) => {
-			// Skip processing if the stat has already been processed and skipSame is true
-			if (skipSame && processedStats.has(id)) {
-				return;
-			}
-
-			// Find matching stat block
-			const descriptionBlock = parsedBlocks.find((block) =>
-				block.stats.some((stat) =>
-					stat
-						.split(' ')
-						.map((s) => s.trim())
-						.includes(id)
-				)
-			);
-
-			if (!descriptionBlock) {
-				console.warn('⚠️ No matching block found for statId:', id);
-				return;
-			}
-
-			// console.log('2. 🔍 Matched Block:', descriptionBlock);
-			// console.log('Values:', values);
-
-			// Process stats in multi-stat blocks
-			let blockStats = descriptionBlock.stats.flatMap((stat) =>
-				stat.split(' ').map((s) => s.trim())
-			);
-
-			// Remove numeric-only prefixes from blockStats
-			blockStats = blockStats.filter((stat) => !/^\d+$/.test(stat));
-
-			const blockValues: number[][] = [];
-
-			// Match stats with their values from groupedStats
-			blockStats.forEach((statId) => {
-				if (groupedStats[statId]) {
-					blockValues.push(groupedStats[statId]);
-					processedStats.add(statId); // Mark as processed
-				} else {
-					blockValues.push([0]); // Default if not found
-				}
-			});
-
-			// console.log('3. 🔄 Block Stats:', blockStats);
-			// console.log('💡 Block Values:', blockValues);
-
-			// Render descriptions for each progression step
-			values.forEach((_, index) => {
-				let renderedDescriptions = descriptionBlock.descriptions.map((desc) => {
-					let result = desc;
-					let value = values[index] || 0;
-					// Replace placeholders ({0}, {1}, ...) with progression values
-					blockValues.forEach((statProgression, idx) => {
-						value = statProgression[index] || 0;
-						let renderedValue: number = value;
-						let renderedText: string = value.toString();
-
-						// Handle specific transformations
-						if (desc.includes('milliseconds_to_seconds_2dp_if_required')) {
-							renderedValue = parseFloat((value / 1000).toFixed(2));
-							renderedText = renderedValue.toString();
-						}
-
-						if (desc.includes('per_minute_to_per_second')) {
-							renderedValue = parseFloat((value / 60).toFixed(1));
-							renderedText = renderedValue.toString();
-						}
-
-						if (desc.includes('divide_by_ten_1dp_if_required')) {
-							renderedValue = parseFloat((value / 10).toFixed(1));
-							renderedText = renderedValue.toString();
-						}
-
-						// divide_by_one_hundred
-						if (desc.includes('divide_by_one_hundred')) {
-							renderedValue = parseFloat((value / 100).toFixed(2)); // Transform value
-							renderedText = `${renderedValue > 0 ? '+' : ''}${renderedValue}`; // Format with sign and percentage
-							result = result.replace(new RegExp(`\\{${idx}\\:\\+d\\}`, 'g'), renderedText); // Replace `{idx:+d}`
-							result = result.replace(new RegExp(`\\{${idx}\\}`, 'g'), renderedText); // Replace `{idx}`
-							result = result.replace('divide_by_one_hundred', ''); // Remove directive
-						} else if (desc.includes(`{${idx}:+d}`)) {
-							renderedText = value >= 0 ? `+${value}` : `${value}`;
-							result = result.replace(new RegExp(`\\{${idx}\\:\\+d\\}`, 'g'), renderedText);
-						} else {
-							result = result.replace(new RegExp(`\\{${idx}\\}`, 'g'), renderedText);
-						}
-
-						if (desc.includes(`{${idx}:+d}`)) {
-							renderedText = value >= 0 ? `+${value}` : `${value}`;
-							result = result.replace(new RegExp(`\\{${idx}\\:\\+d\\}`, 'g'), renderedText);
-						} else {
-							result = result.replace(new RegExp(`\\{${idx}\\}`, 'g'), renderedText);
-						}
-
-						// if the value is 1000, we keep the first result, otherwise we use the second result
-						if (value === 1000) {
-							result = result.replace(
-								'[AddedAttackCastTime|+1000 second]',
-								`+${value / 1000} second`
-							);
-							// remove the 1000 at the start of the description
-							result = result.replace('1000', '');
-							// remove the 1 at the end of the string, not the first occurence
-							result = result.replace(/1$/, '');
-						} else {
-							result = result.replace(
-								'[AddedAttackCastTime|+1000 seconds]',
-								`+${value / 1000} seconds`
-							);
-						}
-					});
-
-					if (result.includes('#|-1 "0% reduced [Projectile] Speed" negate 1')) {
-						result = result.replace(
-							'#|-1 "0% reduced [Projectile] Speed" negate 1',
-							'0% reduced Projectile Speed'
-						);
-					} else if (result.includes('1|# "0% increased [Projectile] Speed"')) {
-						result = result.replace(
-							'1|# "0% increased [Projectile] Speed"',
-							'0% increased Projectile Speed'
-						);
-					}
-
-					if (result.includes('2|# 0 # "Fires 6 [Projectile|Projectiles]"')) {
-						result = result.replace(
-							'2|# 0 # "Fires 6 [Projectile|Projectiles]"',
-							'Fires 6 Projectiles'
-						);
-					} else if (result.includes('2|# 1 # "Fires 6 Arrows"')) {
-						result = result.replace('2|# 1 # "Fires 6 Arrows"', 'Fires 6 Arrows');
-					}
-
-					// Handle singular/plural placeholders
-					if (result.includes('[Projectile|Projectiles]')) {
-						const pluralSuffix = blockValues[0][index] === 1 ? 'Projectile' : 'Projectiles';
-						result = result.replace('[Projectile|Projectiles]', pluralSuffix);
-					}
-
-					// Handle [Critical|Critical Hit]
-					if (result.includes('[Critical|Critical Hit]')) {
-						// replace with "Critical Hit"
-						result = result.replace('[Critical|Critical Hit]', 'Critical Hit');
-					}
-
-					// Handle static replacements
-					result = result
-						.replace('[Chaos|Chaos]', 'Chaos')
-						.replace('[Lightning]', 'Lightning')
-						.replace('[Total]', 'Total')
-						.replace('[Projectile]', 'Projectile')
-						.replace('[Physical]', 'Physical')
-						.replace('[Fire]', 'Fire');
-
-					// Remove leftover directives
-					result = result
-						.replace(/milliseconds_to_seconds_2dp_if_required/g, '')
-						.replace(/per_minute_to_per_second/g, '')
-						.replace(/\s{2,}/g, ' ') // Clean extra spaces
-						.trim();
-
-					return result;
-				});
-
-				// remove all the # from the descriptions
-				renderedDescriptions = renderedDescriptions.map((desc) => desc.replace(/#/g, ''));
-				// remove the quotes from the descriptions
-				renderedDescriptions = renderedDescriptions.map((desc) => desc.replace(/"/g, ''));
-
-				// if value is 1000
-				if (values[index] === 1000) {
-					// discard the second rendered description because we are using singular
-					renderedDescriptions = renderedDescriptions.slice(0, 1);
-				}
-				// if the rendered description is like
-				// [
-				//     "1000 Projectile duration is 2 second 1",
-				//     " Projectile duration is 2 seconds 1"
-				// ]
-				if (renderedDescriptions.length === 2) {
-					const firstDescription = renderedDescriptions[0];
-					const secondDescription = renderedDescriptions[1];
-					const firstMatch = firstDescription.match(/is (\d+) second/);
-					const secondMatch = secondDescription.match(/is (\d+) seconds/);
-					if (firstMatch && secondMatch) {
-						const firstValue = parseInt(firstMatch[1]);
-						const secondValue = parseInt(secondMatch[1]);
-						if (firstValue === 1 && secondValue !== 1) {
-							renderedDescriptions = renderedDescriptions.slice(0, 1);
-						} else {
-							renderedDescriptions = renderedDescriptions.slice(1, 2);
-						}
-					}
-				}
-
-				// Add rendered descriptions to the collection
-				allRenderedDescriptions.push(...renderedDescriptions);
-
-				// console.log('4. 📝 Rendered Descriptions for Level:', index, renderedDescriptions);
-			});
-		});
-
-		// Join all rendered descriptions into skillData.stat_text
-		// skillData.stat_text = allRenderedDescriptions.join('<br>');
-		// console.log('5. 📜 Final Stat Text:', skillData.stat_text);
-		return allRenderedDescriptions;
-	}
 
 	// ✅ Build a Set of Valid Tags from GemTags
 	const validTags = new Set(gemTags.map((tag) => tag.Id));
@@ -408,51 +123,6 @@
 		skillData.gem_tier = skillGem?.CraftingLevel;
 	}
 
-	async function getConstantStats() {
-		// const skillId = mockData.Id;
-		const skillId = rowStoreData?.Id;
-		// console.log('SkillId', skillId);
-		const skillName = rowStoreData?.DisplayedName;
-
-		// TODO: figure out what the deal is here with the name. It's not always the same as the displayed name but its also not always the same as the granted effect name...
-
-		parseBaseItemTypes(skillId, skillName);
-
-		const grantedEffect = await findGrantedEffectId(skillId);
-		// console.log('Effect', grantedEffect);
-
-		await getGemQuality(grantedEffect?.Id);
-
-		try {
-			const castTime = grantedEffect?.CastTime;
-			const staticCostType = grantedEffect?.CostTypes[0]?.Id;
-			skillData.cast_time = castTime / 1000;
-			skillData.static_cost_types = staticCostType;
-			// console.log('CastTime', castTime);
-		} catch (error) {
-			console.error(`No cast time found for skillId: ${skillId}`);
-		}
-
-		const grantedEffectStatSet = grantedEffectStatSets.find(
-			(statSet) => statSet.Id === grantedEffect?.Id
-		);
-		// console.log('EffectStatSet', grantedEffectStatSet);
-
-		const constantStats = grantedEffectStatSet?.ConstantStats || [];
-		const constantStatsValues = grantedEffectStatSet?.ConstantStatsValues || [];
-
-		for (let i = 0; i < constantStats.length; i++) {
-			const statId = constantStats[i]?.Id; // Extract `Id` directly
-			const statValue = constantStatsValues[i];
-			if (statId) {
-				statSet.add({ id: statId, value: statValue });
-			} else {
-				console.warn('⚠️ Invalid statId at index:', i, constantStats[i]);
-			}
-		}
-
-		// console.log('📊 Collected StatSet:', Array.from(statSet));
-	}
 
 	function findGrantedEffectStatSetPerLevel(skillId: string) {
 		// console.log('GrantedEffectsStatSetsPerLevel', grantedEffectsStatSetsPerLevel);
@@ -526,10 +196,11 @@
 		// console.log('StatSet:', statSet);
 		// for each stat in the statSet, we need to get the stat description
 
-		const statDescriptions = await getStatDescriptionsForAll(Array.from(statSetProgression), false);
+		const statDescriptions = await getStatDescriptionsForAll(Array.from(statSetProgression), false, gameVersion);
 		let additionalStatDescriptions = await getStatDescriptionsForAll(
 			Array.from(additionalStatSetProgression),
-			false
+			false,
+      gameVersion
 		);
 
 		additionalStatDescriptions = [];
@@ -552,8 +223,8 @@
 
       additionalStatDescriptions.push(speedDesc);
 
-      console.log('ProjectileCount:', levelStats[0]);
-      console.log('ProjectileSpeed:', levelStats[1]);
+      // console.log('ProjectileCount:', levelStats[0]);
+      // console.log('ProjectileSpeed:', levelStats[1]);
 
       skillData.additional_progression_text.push(additionalStatDescriptions);
 		}
@@ -566,8 +237,8 @@
 
 		// console.log('StatDescriptions:', statDescriptions);
 
-		console.log('AdditionalStats:', additionalStats);
-		console.log('AdditionalStatDescriptions:', additionalStatDescriptions);
+		// console.log('AdditionalStats:', additionalStats);
+		// console.log('AdditionalStatDescriptions:', additionalStatDescriptions);
 
 		// TODO: handle life and mana cost amounts
 		const costAmounts = progression2.map((effect) => effect.CostAmounts[0]);
@@ -632,7 +303,7 @@
 		// console.log('Effect (Dynamic)', grantedEffect?.Id);
 
 		const grantedEffectsPerLevel = findGrantedEffectsPerLevel(grantedEffect?.Id);
-		console.log('EffectPerLevel', grantedEffectsPerLevel);
+		// console.log('EffectPerLevel', grantedEffectsPerLevel);
 		const gemProgression = await findGemProgression(grantedEffectsPerLevel?.GrantedEffect.Id);
 
 		// initialize text string
@@ -730,7 +401,7 @@
 			}
 		}
 
-		console.log('📊 Collected Additional StatSet:', Array.from(statSet));
+		// console.log('📊 Collected Additional StatSet:', Array.from(statSet));
 
 		const floatStats = grantedEffectStatSetPerLevel?.FloatStats || [];
 		const floatStatsValues =
@@ -748,11 +419,11 @@
 			}
 		}
 
-		console.log('📊 Collected Float StatSet:', Array.from(statSet));
+		// console.log('📊 Collected Float StatSet:', Array.from(statSet));
 
 		// const statText = await getStatDescriptionsForAll(Array.from(statSet));
 		// flip the array
-		const statText = await getStatDescriptionsForAll(Array.from(statSet).reverse());
+		const statText = await getStatDescriptionsForAll(Array.from(statSet).reverse(),true, gameVersion);
 		skillData.stat_text = statText?.join('<br>') || '';
 	}
 
@@ -787,7 +458,7 @@
 
 		let gemTags = activeSkill.GemEffects[0].GemTags;
 
-		console.log('GemTags:', gemTags);
+		// console.log('GemTags:', gemTags);
 
 		// Map over gemTags safely
 		let tags = gemTags.map((tag: number) => {
@@ -863,7 +534,7 @@
 		console.log('Data', data);
 		console.log('RowStore', rowStoreData);
 
-		await getConstantStats();
+		let constantStats = await getConstantStats(data);
 		await getDynamicStats();
 		await parseGemTags();
 		console.log('SkillData:', skillData);
@@ -871,7 +542,7 @@
 		// in the statTextRangeValues.stat_text, match the skillData.stat_text and replace the numbers with the values from the statTextRangeValues array
 		// if skilldata.stat_text includes the statTextRangeValues.stat_text, replace the numbers with the values from the statTextRangeValues.stat1_values and stat2_values
 		const finalStatText = replaceDamageText(statTextRangeValues, skillData.stat_text);
-		console.log('Final Stat Text: ', finalStatText);
+		// console.log('Final Stat Text: ', finalStatText);
 
 		skillData.stat_text = finalStatText ?? '';
 
@@ -880,14 +551,16 @@
     {{Item
 |rarity_id                               = ${skillData.rarity_id}
 |name                                    = ${skillData.name}
-|class_id                                = ${skillData.class_id}
-|size_x                                  = ${skillData.size_x}
-|size_y                                  = ${skillData.size_y}
+|class_id                                = ${constantStats.class_id}
+|size_x                                  = ${constantStats.size_x}
+|size_y                                  = ${constantStats.size_y}
 |drop_level                              = ${skillData.drop_level}
 |tags                                    = ${skillData.tags}
-|metadata_id                             = ${skillData.metadata_id}
+|metadata_id                             = ${constantStats.metadata_id}
 |help_text                               = ${skillData.help_text}
-|intelligence_percent                    = ${skillData.intelligence_percent}
+${constantStats.dexterity_percent ? `|dexterity_percent                       = ${constantStats.dexterity_percent}` : ''}
+${constantStats.strength_percent ? `|strength_percent                        = ${constantStats.strength_percent}` : ''}
+${constantStats.intelligence_percent ? `|intelligence_percent                    = ${constantStats.intelligence_percent}` : ''}
 |gem_tags                                = ${skillData.gem_tags}
 |gem_description                         = ${skillData.gem_description}
 |active_skill_name                       = ${skillData.active_skill_name}
@@ -896,15 +569,15 @@
 |skill_id                                = ${skillData.skill_id}
 |cast_time                               = ${skillData.cast_time}
 |required_level                          = ${skillData.required_level}
-|static_cost_types                       = ${skillData.static_cost_types}
+|static_cost_types                       = ${constantStats.static_cost_types}
 |static_critical_strike_chance           = ${skillData.static_critical_strike_chance}
 |stat_text                               = ${skillData.stat_text}
-|gem_tier                                = ${skillData.gem_tier}
+|gem_tier                                = ${constantStats.gem_tier}
 
 
 ${skillData.finalProgression.join('\n')}
 
-${skillData.quality_stats}
+${constantStats.quality_stats}
   }}
   {{Skill progression
   |c1_abbr              = ${skillData.progression_text[0][0]
@@ -964,48 +637,6 @@ ${skillData.quality_stats}
 	function copyToClipboard(): any {
 		// copy wiki text to clipboard
 		navigator.clipboard.writeText(wikitext);
-	}
-
-	async function getGemQuality(grantedEffectId: string) {
-		const qualityStats = data.allData.GrantedEffectQualityStats?.rows.filter(
-			(qualityStat) => qualityStat.GrantedEffect.Id === grantedEffectId
-		);
-
-		// empty set for the statSet
-		let qualSet = new Set<{ id: string; value: number }>();
-		// console.log('QualityStats:', qualityStats);
-		let statId = '';
-		let qualStatText = '';
-		for (let i = 0; i < qualityStats.length; i++) {
-			statId = qualityStats[i].Stats[0].Id;
-			const statValueMin = (qualityStats[i].StatsValuesPermille[0] / 1000) * 1;
-			const statValueMax = (qualityStats[i].StatsValuesPermille[0] / 1000) * 20;
-			if (statId) {
-				qualSet.add({ id: statId, value: statValueMin });
-				qualSet.add({ id: statId, value: statValueMax });
-			} else {
-				console.warn('⚠️ Invalid statId at index:', i, qualityStats[i]);
-			}
-		}
-
-		// console.log('📊 Collected Quality StatSet:', Array.from(qualSet));
-
-		const statText = await getStatDescriptionsForAll(Array.from(qualSet));
-		// console.log('Quality Stat Text:', statText);
-
-		if (statText) {
-			qualStatText = combineStatDescriptions(statText);
-			// skillData.quality_stats = qualStatText;
-		}
-
-		// we need to produce a string like this:
-		//     |quality_type1_stat_text                 = +(0–2)% to Critical Hit Chance
-		// |quality_type1_stat1_id                  = Critical_Hit_Chance
-		// where stat_text is qualStatText and stat1_id is the statId
-		skillData.quality_stats = `
-  |quality_type1_stat_text                 = ${qualStatText}
-  |quality_type1_stat1_id                  = ${statId}
-  `;
 	}
 
 	function combineStatDescriptions(descriptions: string[]): string {
