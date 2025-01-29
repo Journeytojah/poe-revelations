@@ -42,7 +42,7 @@ export async function getConstantStats(data: any) {
   parseBaseItemTypes(skillId, skillName);
 
   const grantedEffect = await findGrantedEffectId(skillId);
-  console.log('Effect', grantedEffect);
+  // console.log('Effect', grantedEffect);
 
   await getGemQuality(grantedEffect?.Id);
 
@@ -51,7 +51,7 @@ export async function getConstantStats(data: any) {
     const staticCostType = grantedEffect?.CostTypes[0]?.Id;
     skillData.cast_time = castTime / 1000;
     skillData.static_cost_types = staticCostType;
-    console.log('CastTime', castTime);
+    // console.log('CastTime', castTime);
   } catch (error) {
     console.error(`No cast time found for skillId: ${skillId}`);
   }
@@ -101,14 +101,13 @@ function parseSkillGems(skillMetadata: string) {
     (skillGem) => skillGem.BaseItemType.Id === skillMetadata
   );
 
-  // console.log('SkillGem', skillGem);
   skillData.intelligence_percent = skillGem?.IntelligenceRequirementPercent;
   skillData.strength_percent = skillGem?.StrengthRequirementPercent;
   skillData.dexterity_percent = skillGem?.DexterityRequirementPercent;
   skillData.gem_tier = skillGem?.CraftingLevel;
 }
 
-async function findGrantedEffectId(skillId: string) {
+export async function findGrantedEffectId(skillId: string) {
   return grantedEffects.find((effect) => {
     try {
       return effect.ActiveSkill?.Id === skillId;

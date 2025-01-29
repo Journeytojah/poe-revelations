@@ -3,6 +3,7 @@
 
 	import { rowStore } from '$lib/stores/rowStore';
 	import { getConstantStats } from '$lib/utils/exporters/activeSkills/getConstantStats.js';
+	import { getDynamicStats } from '$lib/utils/exporters/activeSkills/getDynamicStats.js';
 	import { getStatDescriptionsForAll } from '$lib/utils/exporters/activeSkills/getStatDescriptions.js';
 	import { fetchStatDescriptions } from '$lib/utils/fetchStatDescriptions.js';
 	import { fetchVersion } from '$lib/utils/fetchVersion.js';
@@ -277,156 +278,6 @@
 		return req < 8 ? 0 : req;
 	}
 
-	async function getDynamicStats() {
-		const skillId = rowStoreData?.Id;
-		// console.log('SkillId (Dynamic)', skillId);
-
-		skillData.name = rowStoreData?.DisplayedName;
-		skillData.skill_id = rowStoreData?.Id.charAt(0).toUpperCase() + rowStoreData?.Id.slice(1);
-		// skillData.gem_description = rowStoreData?.Description;
-
-		// first we need to remove any square brackets from the description
-		// and process stats like [Projectile|Projectiles] accordingly
-		let gemDescription = rowStoreData?.Description;
-		gemDescription = gemDescription.replace(/[\[\]]/g, '');
-		gemDescription = gemDescription.replace('[Projectile|Projectiles]', 'Projectiles');
-		gemDescription = gemDescription.replace('Projectile|Projectiles', 'Projectiles');
-		skillData.gem_description = gemDescription;
-
-		const weaponRestrictions = rowStoreData?.WeaponRestriction_ItemClasses || [];
-		const weaponRestrictionNames = weaponRestrictions.map(
-			(restriction: { Id: any }) => restriction.Id
-		);
-		skillData.item_class_id_restriction = weaponRestrictionNames.join(', ');
-
-		const grantedEffect = await findGrantedEffectId(skillId);
-		// console.log('Effect (Dynamic)', grantedEffect?.Id);
-
-		const grantedEffectsPerLevel = findGrantedEffectsPerLevel(grantedEffect?.Id);
-		// console.log('EffectPerLevel', grantedEffectsPerLevel);
-		const gemProgression = await findGemProgression(grantedEffectsPerLevel?.GrantedEffect.Id);
-
-		// initialize text string
-		let progressionText = '';
-
-		gemProgression.stat.forEach((stat, index) => {
-			// console.log('Stat Progression:', stat);
-		});
-
-		gemProgression.floatStats.forEach((stat, index) => {
-			// console.log('Float Stat Progression:', stat);
-		});
-
-		gemProgression.levels.forEach((level, index) => {
-			// console.log('Level:', level);
-
-			const floatStatLength = gemProgression.floatStats[index].length;
-			const additionalStatLength = gemProgression.additionalStats[index].length;
-
-			progressionText = `
-|level${index + 1} = ${index < 20 ? 'True' : 'False'}
-|level${index + 1}_level_requirement = ${gemProgression.levels[index]}
-|level${index + 1}_${skillData.intelligence_percent ? 'intelligence' : 'strength'}_requirement = ${getLevelAttrRequirements(
-				gemProgression.levels[index],
-				skillData.intelligence_percent || skillData.strength_percent || skillData.dexterity_percent
-			)}
-|level${index + 1}_cost_amounts = ${gemProgression.cost[index]}
-|level${index + 1}_stat_text = ${gemProgression.statDescriptions?.[index]} <br> ${gemProgression.additionalStatDescriptions?.[index]}
-|level${index + 1}_stat1_id = ${gemProgression.floatStats[index][0].id}
-|level${index + 1}_stat1_value = ${gemProgression.floatStats[index][0].value}
-|level${index + 1}_stat2_id = ${gemProgression.floatStats[index][1].id}
-|level${index + 1}_stat2_value = ${gemProgression.floatStats[index][1].value}
-`;
-
-			// Dynamically add additional stats
-			if (gemProgression.additionalStats?.[index]) {
-				gemProgression.additionalStats[index].forEach(
-					(stat: { id: any; value: any }, statIndex: number) => {
-						progressionText += `
-|level${index + 1}_stat${statIndex + 3}_id = ${stat.id}
-|level${index + 1}_stat${statIndex + 3}_value = ${stat.value}
-        `;
-					}
-				);
-			}
-
-			// push the text for the first and last levels to the statTextRangeValues array
-			if (index === 0 || index === 19) {
-				// push the stat id and value to the statTextRangeValues array for both stat1 and stat2
-				statTextRangeValues.push({
-					stat1_id: gemProgression.floatStats[index][0].id,
-					stat1_value: gemProgression.floatStats[index][0].value,
-					stat2_id: gemProgression.floatStats[index][1].id,
-					stat2_value: gemProgression.floatStats[index][1].value
-				});
-			}
-
-			// remove the square brackets from the text
-			// TODO: find a better way to do this
-			progressionText = progressionText.replace(/[\[\]]/g, '');
-
-			finalProgression.push(progressionText);
-		});
-
-		statTextRangeValues.push({
-			stat_text: gemProgression.statDescriptions?.[0]
-		});
-
-		gemProgression.cost.forEach((cost, index) => {
-			// console.log('Cost:', cost);
-		});
-
-		gemProgression.statDescriptions?.forEach((description, index) => {
-			// console.log('Stat Description:', description);
-		});
-
-		const grantedEffectStatSetPerLevel = findGrantedEffectStatSetPerLevel(grantedEffect?.Id);
-		// console.log('EffectStatSetPerLevel', grantedEffectStatSetPerLevel);
-		const critChance =
-			grantedEffectStatSetPerLevel?.AttackCritChance ||
-			grantedEffectStatSetPerLevel?.SpellCritChance;
-		// add a % sign
-		skillData.static_critical_strike_chance = critChance / 100;
-
-		const additionalStats = grantedEffectStatSetPerLevel?.AdditionalStats || [];
-		const additionalStatsValues = grantedEffectStatSetPerLevel?.AdditionalStatsValues || [];
-
-		for (let i = 0; i < additionalStats.length; i++) {
-			const statId = additionalStats[i]?.Id;
-			const statValue = additionalStatsValues[i];
-			if (statId) {
-				statSet.add({ id: statId, value: statValue });
-			} else {
-				console.warn('⚠️ Invalid statId at index:', i, additionalStats[i]);
-			}
-		}
-
-		// console.log('📊 Collected Additional StatSet:', Array.from(statSet));
-
-		const floatStats = grantedEffectStatSetPerLevel?.FloatStats || [];
-		const floatStatsValues =
-			grantedEffectStatSetPerLevel?.BaseResolvedValues ||
-			grantedEffectStatSetPerLevel?.FloatStatsValues ||
-			[];
-
-		for (let i = 0; i < floatStats.length; i++) {
-			const statId = floatStats[i]?.Id;
-			const statValue = floatStatsValues[i];
-			if (statId) {
-				statSet.add({ id: statId, value: statValue });
-			} else {
-				console.warn('⚠️ Invalid statId at index:', i, floatStats[i]);
-			}
-		}
-
-		// console.log('📊 Collected Float StatSet:', Array.from(statSet));
-
-		// const statText = await getStatDescriptionsForAll(Array.from(statSet));
-		// flip the array
-		const statText = await getStatDescriptionsForAll(Array.from(statSet).reverse(),true, gameVersion);
-		skillData.stat_text = statText?.join('<br>') || '';
-	}
-
 	async function parseGemTags() {
 		let grantedEffect = rowStoreData?.GrantedEffect;
 
@@ -535,16 +386,19 @@
 		console.log('RowStore', rowStoreData);
 
 		let constantStats = await getConstantStats(data);
-		await getDynamicStats();
+		let dynamicStats = await getDynamicStats(data, skillData, gameVersion);
 		await parseGemTags();
-		console.log('SkillData:', skillData);
+		// console.log('SkillData:', skillData);
+    console.log('ConstantStats:', constantStats);
+    console.log('DynamicStats:', dynamicStats);
+    
 
 		// in the statTextRangeValues.stat_text, match the skillData.stat_text and replace the numbers with the values from the statTextRangeValues array
 		// if skilldata.stat_text includes the statTextRangeValues.stat_text, replace the numbers with the values from the statTextRangeValues.stat1_values and stat2_values
-		const finalStatText = replaceDamageText(statTextRangeValues, skillData.stat_text);
+		const finalStatText = replaceDamageText(statTextRangeValues, dynamicStats.stat_text);
 		// console.log('Final Stat Text: ', finalStatText);
 
-		skillData.stat_text = finalStatText ?? '';
+		dynamicStats.stat_text = finalStatText ?? '';
 
 		// Generate Wikitext
 		wikitext = `
@@ -578,61 +432,61 @@ ${constantStats.intelligence_percent ? `|intelligence_percent                   
 ${skillData.finalProgression.join('\n')}
 
 ${constantStats.quality_stats}
-  }}
-  {{Skill progression
-  |c1_abbr              = ${skillData.progression_text[0][0]
-		.replace(/(\d+) to (\d+)/, '')
-		.replace(/Deals/, '')
-		.replace(/[\[\]]/g, '')}
-    |c1_header          = ${skillData.progression_text[0][0]
-			.replace(/(\d+) to (\d+)/, 'x to y')
-			.replace(/[\[\]]/g, '')}
-    |c1_pattern_extract = ${skillData.progression_text[0][0]
-			.replace(/(\d+) to (\d+)/, '(%d+) to (%d+)')
-			.replace(/[\[\]]/g, '')}
-    |c1_pattern_value   = %d&nbsp;to&nbsp;%d
-    |c2_abbr              = ${skillData.additional_progression_text[0][0]
-			.replace(/(\d+) to (\d+)/, '')
-			.replace(/Deals/, '')
-      // if it includes Fires x Projectiles, we shoudl show "Projectile Count" instead of "Fires x Projectiles"
-      .replace(/Fires (\d+) Projectiles/, 'Projectile Count')
-			.replace(/[\[\]]/g, '')}
-    |c2_header          = ${skillData.additional_progression_text[0][0]
-			.replace(/(\d+) to (\d+)/, 'x to y')
-      .replace(/Fires (\d+) Projectiles/, 'Fires x Projectiles')
-			.replace(/[\[\]]/g, '')}
-    |c2_pattern_extract = ${skillData.additional_progression_text[0][0]
-			.replace(/(\d+) to (\d+)/, '(%d+) to (%d+)')
-      // Fires (%d+) Projectiles
-      .replace(/Fires (\d+) Projectiles/, 'Fires (%d+) Projectiles')
-			.replace(/[\[\]]/g, '')}
-    |c2_pattern_value   = %d
-    |c3_abbr              = ${skillData.additional_progression_text[0][1]
-      .replace(/(\d+) to (\d+)/, '')
-      // 0% increased Projectile Speed
-      .replace(/0% increased Projectile Speed/, 'Projectile Speed')
-      .replace(/[\[\]]/g, '')}
-    |c3_header          = ${skillData.additional_progression_text[0][1]
-      .replace(/(\d+) to (\d+)/, 'x to y')
-      // x% Increased Projectile Speed
-      .replace(/(\d+)% increased Projectile Speed/, 'x% Increased Projectile Speed')
-      .replace(/[\[\]]/g, '')}
-    |c3_pattern_extract = ${skillData.additional_progression_text[0][1]
-      .replace(/(\d+) to (\d+)/, '(%d+) to (%d+)')
-      // (%d+)%% Increased Projectile Speed
-      .replace(/(\d+)% increased Projectile Speed/, '(%d+)%% Increased Projectile Speed')
-      .replace(/[\[\]]/g, '')}
-    |c3_pattern_value   =  %d%%
 
-  }}
-  `;
-		// {{Skill progression
-		// |c1_abbr              = Cold<br>Damage
-		//   |c1_header          = Deals x to y Cold Damage
-		//   |c1_pattern_extract = Deals (%d+) to (%d+) Cold Damage
-		//   |c1_pattern_value   = %d&nbsp;to&nbsp;%d
-		// }}
+`;
+// }}
+// {{Skill progression
+// |c1_abbr              = ${skillData.progression_text[0][0]
+//   .replace(/(\d+) to (\d+)/, '')
+//   .replace(/Deals/, '')
+//   .replace(/[\[\]]/g, '')}
+//   |c1_header          = ${skillData.progression_text[0][0]
+//     .replace(/(\d+) to (\d+)/, 'x to y')
+//     .replace(/[\[\]]/g, '')}
+//   |c1_pattern_extract = ${skillData.progression_text[0][0]
+//     .replace(/(\d+) to (\d+)/, '(%d+) to (%d+)')
+//     .replace(/[\[\]]/g, '')}
+//   |c1_pattern_value   = %d&nbsp;to&nbsp;%d
+//   |c2_abbr              = ${skillData.additional_progression_text[0][0]
+//     .replace(/(\d+) to (\d+)/, '')
+//     .replace(/Deals/, '')
+//     // if it includes Fires x Projectiles, we shoudl show "Projectile Count" instead of "Fires x Projectiles"
+//     .replace(/Fires (\d+) Projectiles/, 'Projectile Count')
+//     .replace(/[\[\]]/g, '')}
+//   |c2_header          = ${skillData.additional_progression_text[0][0]
+//     .replace(/(\d+) to (\d+)/, 'x to y')
+//     .replace(/Fires (\d+) Projectiles/, 'Fires x Projectiles')
+//     .replace(/[\[\]]/g, '')}
+//   |c2_pattern_extract = ${skillData.additional_progression_text[0][0]
+//     .replace(/(\d+) to (\d+)/, '(%d+) to (%d+)')
+//     // Fires (%d+) Projectiles
+//     .replace(/Fires (\d+) Projectiles/, 'Fires (%d+) Projectiles')
+//     .replace(/[\[\]]/g, '')}
+//   |c2_pattern_value   = %d
+//   |c3_abbr              = ${skillData.additional_progression_text[0][1]
+//     .replace(/(\d+) to (\d+)/, '')
+//     // 0% increased Projectile Speed
+//     .replace(/0% increased Projectile Speed/, 'Projectile Speed')
+//     .replace(/[\[\]]/g, '')}
+//   |c3_header          = ${skillData.additional_progression_text[0][1]
+//     .replace(/(\d+) to (\d+)/, 'x to y')
+//     // x% Increased Projectile Speed
+//     .replace(/(\d+)% increased Projectile Speed/, 'x% Increased Projectile Speed')
+//     .replace(/[\[\]]/g, '')}
+//   |c3_pattern_extract = ${skillData.additional_progression_text[0][1]
+//     .replace(/(\d+) to (\d+)/, '(%d+) to (%d+)')
+//     // (%d+)%% Increased Projectile Speed
+//     .replace(/(\d+)% increased Projectile Speed/, '(%d+)%% Increased Projectile Speed')
+//     .replace(/[\[\]]/g, '')}
+//   |c3_pattern_value   =  %d%%
 	});
+// }}
+//   {{Skill progression
+//   |c1_abbr              = Cold<br>Damage
+//     |c1_header          = Deals x to y Cold Damage
+//     |c1_pattern_extract = Deals (%d+) to (%d+) Cold Damage
+//     |c1_pattern_value   = %d&nbsp;to&nbsp;%d
+//   }}
 
 	function copyToClipboard(): any {
 		// copy wiki text to clipboard
